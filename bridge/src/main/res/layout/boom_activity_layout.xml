@@ -29,7 +29,7 @@
                 android:id="@+id/boom_multi_selected_bg"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:background="@drawable/boom_multi_select_bg"
+                android:background="@drawable/boom_liquid_select_rect_bg"
                 android:orientation="vertical"
                 android:visibility="gone" />
 
@@ -58,7 +58,7 @@
         android:layout_gravity="top|center_horizontal"
         android:layout_marginTop="18dp"
         android:alpha="0"
-        android:background="@drawable/boom_multi_select_bg"
+        android:background="@drawable/boom_liquid_select_rect_bg"
         android:ellipsize="end"
         android:gravity="center"
         android:maxLines="1"
@@ -77,7 +77,7 @@
         android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="18dp"
         android:alpha="0"
-        android:background="@drawable/boom_multi_select_bg"
+        android:background="@drawable/boom_liquid_select_rect_bg"
         android:ellipsize="end"
         android:gravity="center"
         android:maxLines="1"

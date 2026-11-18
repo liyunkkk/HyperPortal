@@ -65,8 +65,6 @@ class TextSegmentationActivity : ComponentActivity() {
     private var launchTouchY by mutableIntStateOf(-1)
     private var currentText = ""
     private var currentSegment: IntArray? = null
-    private var liquidText by mutableStateOf("")
-    private var liquidWords by mutableStateOf<List<String>>(emptyList())
     private var animatedDismissRequester: (() -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,12 +84,17 @@ class TextSegmentationActivity : ComponentActivity() {
         }
 
         setContent {
-            LiquidGlassBigBangPanel(
-                words = liquidWords,
-                fullText = liquidText,
-                onSearch = { q -> openSearch(q, BoomActionHandler.SEARCH_WEB) },
-                onEdit = { showUnsupportedAction() },
-                onClose = { finish() },
+            BigBangOverlayContent(
+                contentView = legacyContentView,
+                touchX = launchTouchX,
+                touchY = launchTouchY,
+                onDismissRequesterChanged = { animatedDismissRequester = it },
+                onDismissRequest = { shouldDismissPage() },
+                onDismissFinished = { finish() },
+                onEditMode = { showUnsupportedAction() },
+                onSelectAll = { selectAll() },
+                onShareAll = { shareAll() },
+                onMore = { showUnsupportedAction() },
             )
         }
 
@@ -208,16 +211,6 @@ class TextSegmentationActivity : ComponentActivity() {
         }
         currentText = text
         currentSegment = result
-        liquidText = text
-        val parsed = ArrayList<String>(result.size / 2)
-        var i = 0
-        while (i + 1 < result.size) {
-            val s = result[i].coerceIn(0, text.length)
-            val e = (result[i + 1] + 1).coerceIn(s, text.length)
-            if (e > s) parsed.add(text.substring(s, e))
-            i += 2
-        }
-        liquidWords = parsed.ifEmpty { listOf(text) }
         if (fromSavedState) {
             // The chip core restores the serialised selection during its first layout pass.
         }
@@ -283,12 +276,12 @@ private fun BigBangOverlayContent(
 ) {
     val dark = isSystemInDarkTheme()
     val panelMetrics = rememberOverlayPanelMetrics()
-    val panelBackground = if (dark) Color(0xCC161B22) else Color(0xCCF4F7FB)
-    val panelBorder = if (dark) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.78f)
-    val topBarColor = if (dark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.55f)
-    val bottomBarColor = if (dark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.55f)
-    val scrimColor = if (dark) Color.Black.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.28f)
-    val shadowColor = Color.Black.copy(alpha = 0.5f)
+    val panelBackground = if (dark) Color(0xEA161B24) else Color(0xEAF2F6FD)
+    val panelBorder = if (dark) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.88f)
+    val topBarColor = if (dark) Color(0x66222938) else Color(0xB8FFFFFF)
+    val bottomBarColor = if (dark) Color(0x66222938) else Color(0xB8FFFFFF)
+    val scrimColor = if (dark) Color.Black.copy(alpha = 0.42f) else Color.Black.copy(alpha = 0.24f)
+    val shadowColor = Color.Black.copy(alpha = 0.36f)
     val panelShape = androidx.compose.foundation.shape.RoundedCornerShape(panelMetrics.cornerRadius)
     var panelVisible by remember { mutableStateOf(false) }
     var dismissing by remember { mutableStateOf(false) }
@@ -384,8 +377,8 @@ private fun BigBangOverlayContent(
                         center = {
                             androidx.compose.material3.Text(
                                 text = stringResource(R.string.bigbang_overlay_title),
-                                color = if (dark) Color(0xFFF2F5F8) else Color(0xFFD1CCC6),
-                                fontSize = 20.sp,
+                                color = if (dark) Color(0xFFF3F6FC) else Color(0xFF1E293B),
+                                fontSize = 18.sp,
                                 fontWeight = FontWeight.SemiBold,
                             )
                         },

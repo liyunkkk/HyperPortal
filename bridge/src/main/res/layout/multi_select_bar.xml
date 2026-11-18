@@ -5,6 +5,7 @@
         android:layout_height="wrap_content"
         android:layout_marginLeft="@dimen/page_margin_left"
         android:layout_marginRight="@dimen/page_margin_right"
+        android:background="@drawable/boom_liquid_bar_bg"
         android:orientation="horizontal"
         android:visibility="invisible">
 
