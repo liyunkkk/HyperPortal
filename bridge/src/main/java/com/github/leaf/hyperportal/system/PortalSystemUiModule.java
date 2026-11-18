@@ -152,6 +152,8 @@ public final class PortalSystemUiModule {
 
     private static final Set<String> sHookedProviderClasses =
             java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    private static final Set<String> sHookedAppOnCreateClasses =
+            java.util.Collections.synchronizedSet(new java.util.HashSet<>());
     private static volatile String sLastAesPackage;
     private static volatile long sLastAesWriteAt;
     private static volatile XposedInterface sXposed;
@@ -216,23 +218,25 @@ public final class PortalSystemUiModule {
             }
 
             Method onCreateMethod = appClass.getDeclaredMethod("onCreate");
-            xposed.hook(onCreateMethod).setId("sysui-app-onCreate").intercept(chain -> {
-                Object result = chain.proceed();
-                try {
-                    Object thisObj = chain.getThisObject();
-                    if (thisObj instanceof Application) {
-                        Application app = (Application) thisObj;
-                        sSysUiContext = app.getApplicationContext();
-                        ensureProviderHooksForContext(sSysUiContext);
-                        sHandler.post(() -> initOverlay(sSysUiContext));
-                        xposed.log(Log.INFO, TAG, "SystemUIApplication.onCreate intercepted, overlay initialized!");
+            if (sHookedAppOnCreateClasses.add(appClass.getName())) {
+                xposed.hook(onCreateMethod).setId("sysui-app-onCreate").intercept(chain -> {
+                    Object result = chain.proceed();
+                    try {
+                        Object thisObj = chain.getThisObject();
+                        if (thisObj instanceof Application) {
+                            Application app = (Application) thisObj;
+                            sSysUiContext = app.getApplicationContext();
+                            ensureProviderHooksForContext(sSysUiContext);
+                            sHandler.post(() -> initOverlay(sSysUiContext));
+                            xposed.log(Log.INFO, TAG, "SystemUIApplication.onCreate intercepted, overlay initialized!");
+                        }
+                    } catch (Throwable t) {
+                        xposed.log(Log.ERROR, TAG, "initOverlay failed", t);
                     }
-                } catch (Throwable t) {
-                    xposed.log(Log.ERROR, TAG, "initOverlay failed", t);
-                }
-                return result;
-            });
-            xposed.log(Log.INFO, TAG, "Hooked SystemUIApplication.onCreate successfully!");
+                    return result;
+                });
+                xposed.log(Log.INFO, TAG, "Hooked SystemUIApplication.onCreate successfully!");
+            }
         } catch (Throwable throwable) {
             xposed.log(Log.ERROR, TAG, "Failed to hook SystemUI", throwable);
         }
@@ -769,17 +773,6 @@ public final class PortalSystemUiModule {
                 return;
             }
             try {
-                // Evict any legacy or previous-classloader SystemUiOverlay instances
-                // that are still alive in this SystemUI process (e.g. from pre-ai6
-                // multi-package onPackageLoaded calls or hot reloads).
-                try {
-                    Intent evict = new Intent(ACTION_TEARDOWN_OVERLAY);
-                    evict.setPackage("com.android.systemui");
-                    evict.putExtra(EXTRA_INSTANCE_ID, INSTANCE_ID);
-                    context.sendBroadcast(evict);
-                } catch (Throwable ignored) {
-                }
-
                 long started = SystemClock.uptimeMillis();
                 SystemUiOverlay overlay = new SystemUiOverlay(context);
                 // Register first: from here on every drag is handled, even
@@ -796,6 +789,15 @@ public final class PortalSystemUiModule {
             }
         }
         sBgExecutor.execute(() -> {
+            // Evict any legacy or previous-classloader SystemUiOverlay instances
+            // off the main thread so boot-time sendBroadcast never stalls SystemUI.
+            try {
+                Intent evict = new Intent(ACTION_TEARDOWN_OVERLAY);
+                evict.setPackage("com.android.systemui");
+                evict.putExtra(EXTRA_INSTANCE_ID, INSTANCE_ID);
+                context.sendBroadcast(evict);
+            } catch (Throwable ignored) {
+            }
             ensureProviderHooksForContext(context);
             // The home page reads __status__ (and the AES handshake log) from
             // SystemUI's FileProvider. Grant this once at startup: the earlier

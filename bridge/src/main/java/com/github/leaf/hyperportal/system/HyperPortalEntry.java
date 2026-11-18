@@ -57,11 +57,7 @@ public final class HyperPortalEntry extends XposedModule {
     @Override
     public void onPackageLoaded(PackageLoadedParam param) {
         super.onPackageLoaded(param);
-        String processName = mProcessName != null ? mProcessName : android.app.Application.getProcessName();
         if ("com.android.systemui".equals(param.getPackageName())) {
-            if (!param.isFirstPackage() || !"com.android.systemui".equals(processName)) {
-                return;
-            }
             log(Log.INFO, TAG, "onPackageLoaded: injecting Aurora Glow & Bottom Shelf into SystemUI");
             PortalSystemUiModule.initSystemUi(this, param);
         } else if ("com.xiaomi.aicr".equals(param.getPackageName())) {
