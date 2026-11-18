@@ -37,7 +37,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -180,7 +180,6 @@ private fun AiSettingsScreen(onBack: () -> Unit) {
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         TextButton(
-                            text = if (fetchingModels) "拉取中..." else "拉取模型列表",
                             enabled = !fetchingModels && !testing,
                             onClick = {
                                 fetchingModels = true
@@ -210,9 +209,10 @@ private fun AiSettingsScreen(onBack: () -> Unit) {
                                 }
                             },
                             modifier = Modifier.weight(1f),
-                        )
+                        ) {
+                            Text(if (fetchingModels) "拉取中..." else "拉取模型列表")
+                        }
                         Button(
-                            text = if (testing) "测试中..." else "测试连接",
                             enabled = !testing && !fetchingModels,
                             onClick = {
                                 testing = true
@@ -229,7 +229,9 @@ private fun AiSettingsScreen(onBack: () -> Unit) {
                                 }
                             },
                             modifier = Modifier.weight(1f),
-                        )
+                        ) {
+                            Text(if (testing) "测试中..." else "测试连接")
+                        }
                     }
                 }
             }
