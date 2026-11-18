@@ -5,7 +5,7 @@
     android:layout_marginLeft="@dimen/page_margin_left"
     android:layout_marginRight="@dimen/page_margin_right"
     android:background="@drawable/boom_liquid_bar_bg"
-    android:elevation="6dp"
+    android:elevation="4dp"
     android:paddingLeft="8dp"
     android:paddingTop="5dp"
     android:paddingRight="8dp"

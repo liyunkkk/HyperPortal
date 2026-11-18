@@ -7,6 +7,8 @@ import android.util.Log
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.app.Activity
+import android.content.Context
+import android.view.LayoutInflater
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
@@ -28,6 +30,9 @@ internal class BoomChipPage(activity: Activity, contentView: View, enableLegacyM
     val mScroller: CustomScrollView
     val mCancel: View
     val mBoomPage: View = contentView
+    // The legacy chip tree uses this light configuration context as well as the
+    // Compose shell, so drawable-night resources cannot reintroduce a dark skin.
+    private val mUiContext: Context = contentView.context
     val mBoomActionHandler: BoomActionHandler
     val mDismissClickListener: View.OnClickListener
 
@@ -111,13 +116,13 @@ internal class BoomChipPage(activity: Activity, contentView: View, enableLegacyM
         mScrollerBaseInset = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,
             28f,
-            mActivity.resources.displayMetrics,
+            mUiContext.resources.displayMetrics,
         ).toInt()
         if (!mEnableLegacyMask) {
             mMask.visibility = View.GONE
             removeLegacyChromeSpacing()
         }
-        mLayout = BoomWordsLayout(mActivity)
+        mLayout = BoomWordsLayout(mUiContext)
         mBoomConent.setBoomPage(this)
         mDismissClickListener = View.OnClickListener {
             if (!handleClick()) {
@@ -155,7 +160,7 @@ internal class BoomChipPage(activity: Activity, contentView: View, enableLegacyM
 
     private fun removeLegacyChromeSpacing() {
         val selectBarHeadroom = abs(
-            mActivity.resources.getDimensionPixelOffset(R.dimen.chip_row_move_up_offset),
+            mUiContext.resources.getDimensionPixelOffset(R.dimen.chip_row_move_up_offset),
         )
         val scrollerParams = mScroller.layoutParams as ViewGroup.MarginLayoutParams
         scrollerParams.topMargin = 0
@@ -426,11 +431,11 @@ internal class BoomChipPage(activity: Activity, contentView: View, enableLegacyM
             val start = mLayout.getRowStart(i)
             val count = mLayout.getColumnCount(i)
             if (mLayout.isGapRow(i)) {
-                val rowHeight = mActivity.resources.getDimensionPixelOffset(R.dimen.chip_row_height)
+                val rowHeight = mUiContext.resources.getDimensionPixelOffset(R.dimen.chip_row_height)
                 val gapHeight = Math.round(
                     rowHeight * BigBangSettings.get(mActivity).gapRowHeightPercent / 100f,
                 )
-                val spacer = View(mActivity)
+                val spacer = View(mUiContext)
                 spacer.layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     gapHeight,
@@ -438,7 +443,7 @@ internal class BoomChipPage(activity: Activity, contentView: View, enableLegacyM
                 mBoomConent.addView(spacer)
                 continue
             }
-            val row = LinearLayout(mActivity)
+            val row = LinearLayout(mUiContext)
             row.orientation = LinearLayout.HORIZONTAL
             row.layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -446,7 +451,7 @@ internal class BoomChipPage(activity: Activity, contentView: View, enableLegacyM
             )
             for (j in 0 until count) {
                 val isPunc = mLayout.isPunc(start + j)
-                val chipView = mActivity.layoutInflater.inflate(
+                val chipView = LayoutInflater.from(mUiContext).inflate(
                     if (isPunc) R.layout.boom_punc_layout else R.layout.boom_chip_layout,
                     null,
                 )
@@ -578,15 +583,15 @@ internal class BoomChipPage(activity: Activity, contentView: View, enableLegacyM
     }
 
     private fun getHintTitle(direction: String): String = if ("before" == direction) {
-        mActivity.getString(R.string.bigbang_pull_previous)
+        mUiContext.getString(R.string.bigbang_pull_previous)
     } else {
-        mActivity.getString(R.string.bigbang_pull_next)
+        mUiContext.getString(R.string.bigbang_pull_next)
     }
 
     private fun getTriggerDistance(): Float = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_DIP,
         88f,
-        mActivity.resources.displayMetrics,
+        mUiContext.resources.displayMetrics,
     )
 
     private fun clampHoldOffset(offset: Float): Float {
@@ -657,7 +662,7 @@ internal class BoomChipPage(activity: Activity, contentView: View, enableLegacyM
         }
 
         fun setSelected(selected: Boolean) {
-            word.setShadowLayer(if (selected) 1.0f else 0f, 0f, -3.0f, 0x1f000000)
+            word.setShadowLayer(if (selected) 0.75f else 0f, 0f, 1.0f, 0x33265D9A)
             word.isSelected = selected
         }
     }

@@ -7,6 +7,7 @@ import android.util.Log
 import android.app.SearchManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Color as AndroidColor
 import android.net.Uri
 import android.os.Bundle
@@ -18,7 +19,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -68,7 +68,13 @@ class TextSegmentationActivity : ComponentActivity() {
         window.navigationBarColor = AndroidColor.TRANSPARENT
         updateLaunchPosition()
 
-        legacyContentView = layoutInflater.inflate(R.layout.boom_activity_layout, null, false)
+        val lightConfiguration = Configuration(resources.configuration).apply {
+            uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
+                Configuration.UI_MODE_NIGHT_NO
+        }
+        val lightUiContext = createConfigurationContext(lightConfiguration)
+        legacyContentView = layoutInflater.cloneInContext(lightUiContext)
+            .inflate(R.layout.boom_activity_layout, null, false)
         legacyContentView.findViewById<View>(R.id.boom_page).apply {
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
             BoomAnimator.makeFadeIn(this, BoomAnimator.BOOM_DURATION)
@@ -268,41 +274,40 @@ private fun BigBangOverlayContent(
     onShareAll: () -> Unit,
     onMore: () -> Unit,
 ) {
-    val dark = isSystemInDarkTheme()
+    // The segmentation sheet intentionally stays light to match the approved Liquid Glass preview.
     val panelMetrics = rememberOverlayPanelMetrics()
-    val panelBackground = if (dark) Color(0xE0181E2A) else Color(0xE0F6F9FF)
-    val panelFallbackBackground = if (dark) Color(0xF5181E2A) else Color(0xF5F6F9FF)
-    val panelBrush = remember(dark) {
-        if (dark) {
-            Brush.verticalGradient(listOf(Color(0xE0181E2A), Color(0xD6121722)))
-        } else {
-            Brush.verticalGradient(listOf(Color(0xE0F6F9FF), Color(0xD6EBF1FC)))
-        }
+    val panelBackground = Color(0xC7FFFFFF)
+    val panelFallbackBackground = Color(0xF5FAFCFF)
+    val panelBrush = remember {
+        Brush.verticalGradient(
+            listOf(
+                Color(0xB8FFFFFF),
+                Color(0xA8F4F9FF),
+                Color(0xB8EFF6FF),
+            ),
+        )
     }
-    val panelFallbackBrush = remember(dark) {
-        if (dark) {
-            Brush.verticalGradient(listOf(Color(0xF5181E2A), Color(0xF0121722)))
-        } else {
-            Brush.verticalGradient(listOf(Color(0xF5F6F9FF), Color(0xF0EBF1FC)))
-        }
+    val panelFallbackBrush = remember {
+        Brush.verticalGradient(listOf(Color(0xF5FAFCFF), Color(0xF0F4F8FC)))
     }
-    val panelBorder = if (dark) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.92f)
-    val innerTopHighlight = if (dark) Color.White.copy(alpha = 0.26f) else Color.White.copy(alpha = 0.95f)
-    val innerBottomHighlight = if (dark) Color.White.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.45f)
-    val topBarColor = if (dark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.56f)
-    val bottomBarColor = if (dark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.56f)
-    val scrimColor = if (dark) Color.Black.copy(alpha = 0.46f) else Color(0xFF0F172A).copy(alpha = 0.24f)
-    val shadowColor = if (dark) Color.Black.copy(alpha = 0.55f) else Color(0xFF0F172A).copy(alpha = 0.24f)
-    val iconTint = if (dark) Color(0xFFE2E8F0) else Color(0xFF334155)
-    val mutedIconTint = if (dark) Color(0xFFE2E8F0).copy(alpha = 0.32f) else Color(0xFF334155).copy(alpha = 0.35f)
-    val titleColor = if (dark) Color(0xFFF1F5F9) else Color(0xFF0F172A)
+    val panelBorder = Color.White.copy(alpha = 0.94f)
+    val innerTopHighlight = Color.White.copy(alpha = 0.82f)
+    val innerBottomHighlight = Color.White.copy(alpha = 0.50f)
+    val topBarColor = Color.White.copy(alpha = 0.40f)
+    val bottomBarColor = Color.White.copy(alpha = 0.36f)
+    val dividerColor = Color(0xFF8CA5C0).copy(alpha = 0.18f)
+    val scrimColor = Color(0xFFF5F9FF).copy(alpha = 0.22f)
+    val shadowColor = Color(0xFF658BB5).copy(alpha = 0.18f)
+    val iconTint = Color(0xFF435A78)
+    val mutedIconTint = Color(0xFF435A78).copy(alpha = 0.36f)
+    val titleColor = Color(0xFF263951)
     val panelShape = androidx.compose.foundation.shape.RoundedCornerShape(panelMetrics.cornerRadius)
     var panelVisible by remember { mutableStateOf(false) }
     var dismissing by remember { mutableStateOf(false) }
     var panelBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     val enterProgress by animateFloatAsState(
         targetValue = if (panelVisible) 1f else 0f,
-        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "bigbang_panel_enter",
         finishedListener = {
             if (dismissing && it == 0f) {
@@ -312,7 +317,7 @@ private fun BigBangOverlayContent(
     )
     val scrimProgress by animateFloatAsState(
         targetValue = if (panelVisible) 1f else 0f,
-        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
         label = "bigbang_scrim_enter",
     )
     val transformOrigin = remember(panelBounds, touchX, touchY) {
@@ -326,7 +331,7 @@ private fun BigBangOverlayContent(
             )
         }
     }
-    val panelScale = 0.84f + (0.16f * enterProgress)
+    val panelScale = 0.90f + (0.10f * enterProgress)
     val requestDismiss = {
         if (!dismissing && onDismissRequest()) {
             dismissing = true
@@ -344,7 +349,7 @@ private fun BigBangOverlayContent(
     ApplyOverlaySystemBars(
         statusBarColor = if (panelMetrics.fullScreen) topBarColor else Color.Transparent,
         navigationBarColor = if (panelMetrics.fullScreen) bottomBarColor else Color.Transparent,
-        darkIcons = !dark,
+        darkIcons = true,
     )
     OverlayScene(
         scrimColor = scrimColor.copy(alpha = scrimColor.alpha * scrimProgress),
@@ -364,7 +369,7 @@ private fun BigBangOverlayContent(
                 },
             shape = panelShape,
             cornerRadius = panelMetrics.cornerRadius,
-            backdropBlurRadius = 42.dp * enterProgress,
+            backdropBlurRadius = 38.dp * enterProgress,
             backgroundColor = panelBackground,
             fallbackBackgroundColor = panelFallbackBackground,
             backgroundBrush = panelBrush,
@@ -381,7 +386,7 @@ private fun BigBangOverlayContent(
                         topInset = panelMetrics.topSystemInset,
                         leftInset = panelMetrics.leftSystemInset,
                         rightInset = panelMetrics.rightSystemInset,
-                        dividerColor = panelBorder,
+                        dividerColor = dividerColor,
                         leading = {
                             OverlayIconAction(
                                 imageVector = LiquidGlassIcons.Edit,
@@ -426,7 +431,7 @@ private fun BigBangOverlayContent(
                         bottomInset = panelMetrics.bottomSystemInset,
                         leftInset = panelMetrics.leftSystemInset,
                         rightInset = panelMetrics.rightSystemInset,
-                        dividerColor = panelBorder,
+                        dividerColor = dividerColor,
                         leading = {
                             OverlayIconAction(
                                 imageVector = LiquidGlassIcons.Ocr,
