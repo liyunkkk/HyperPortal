@@ -180,6 +180,7 @@ private fun AiSettingsScreen(onBack: () -> Unit) {
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         TextButton(
+                            text = if (fetchingModels) "拉取中..." else "拉取模型列表",
                             enabled = !fetchingModels && !testing,
                             onClick = {
                                 fetchingModels = true
@@ -209,9 +210,7 @@ private fun AiSettingsScreen(onBack: () -> Unit) {
                                 }
                             },
                             modifier = Modifier.weight(1f),
-                        ) {
-                            Text(if (fetchingModels) "拉取中..." else "拉取模型列表")
-                        }
+                        )
                         Button(
                             enabled = !testing && !fetchingModels,
                             onClick = {
