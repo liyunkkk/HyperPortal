@@ -72,6 +72,10 @@ class TextSegmentationActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = AndroidColor.TRANSPARENT
         window.navigationBarColor = AndroidColor.TRANSPARENT
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            window.setBackgroundBlurRadius(60)
+        }
         updateLaunchPosition()
 
         legacyContentView = layoutInflater.inflate(R.layout.boom_activity_layout, null, false)
@@ -125,6 +129,12 @@ class TextSegmentationActivity : ComponentActivity() {
     /** Called by the imported selection toolbar. */
     fun openSearch(text: String, type: Int) {
         if (text.isBlank()) {
+            return
+        }
+        if (type == BoomActionHandler.SEARCH_DICTIONARY &&
+            com.github.leaf.hyperportal.ai.AiRoleSettings.read(this).isConfigured()
+        ) {
+            com.github.leaf.hyperportal.ai.AiTranslateDialog.show(this, text)
             return
         }
         val query = if (type == BoomActionHandler.SEARCH_DICTIONARY) "$text 词典" else text
@@ -270,11 +280,11 @@ private fun BigBangOverlayContent(
 ) {
     val dark = isSystemInDarkTheme()
     val panelMetrics = rememberOverlayPanelMetrics()
-    val panelBackground = if (dark) Color(0xFF171B20) else Color(0xFFF3F3F4)
-    val panelBorder = if (dark) Color(0xFF2E353E) else Color(0xFFD7D7DA)
-    val topBarColor = if (dark) Color(0xFF1D2126) else Color.White
-    val bottomBarColor = if (dark) Color(0xFF1D2126) else Color.White
-    val scrimColor = if (dark) Color.Black.copy(alpha = 0.62f) else Color.Black.copy(alpha = 0.48f)
+    val panelBackground = if (dark) Color(0xCC161B22) else Color(0xCCF4F7FB)
+    val panelBorder = if (dark) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.78f)
+    val topBarColor = if (dark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.55f)
+    val bottomBarColor = if (dark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.55f)
+    val scrimColor = if (dark) Color.Black.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.28f)
     val shadowColor = Color.Black.copy(alpha = 0.5f)
     val panelShape = androidx.compose.foundation.shape.RoundedCornerShape(panelMetrics.cornerRadius)
     var panelVisible by remember { mutableStateOf(false) }

@@ -197,6 +197,16 @@ internal class BoomActionHandler(boomPage: BoomChipPage, enableFakeSelectBar: Bo
         clipboard.setPrimaryClip(ClipData.newPlainText(null, text))
     }
 
+    private fun handleDictOrAi(text: String) {
+        val activity = mBoomPage.mActivity
+        val aiConfig = com.github.leaf.hyperportal.ai.AiRoleSettings.read(activity)
+        if (aiConfig.isConfigured()) {
+            com.github.leaf.hyperportal.ai.AiTranslateDialog.show(activity, text)
+        } else {
+            search(text, SEARCH_DICTIONARY)
+        }
+    }
+
     fun search(text: String, type: Int) {
         val activity = mBoomPage.mActivity
         if (activity is TextSegmentationActivity) {
@@ -223,7 +233,7 @@ internal class BoomActionHandler(boomPage: BoomChipPage, enableFakeSelectBar: Bo
         resegmentView.setOnClickListener { mBoomPage.splitSelectedWordsToChars() }
         searchView.setOnClickListener { search(getSelectedText(), SEARCH_WEB) }
         val dictView: ImageView = mSelectBar.findViewById(R.id.all_dict)
-        dictView.setOnClickListener { search(getSelectedText(), SEARCH_DICTIONARY) }
+        dictView.setOnClickListener { handleDictOrAi(getSelectedText()) }
         val shareView: ImageView = mSelectBar.findViewById(R.id.all_share)
         shareView.setOnClickListener { share() }
         val copyView: ImageView = mSelectBar.findViewById(R.id.all_copy)
@@ -237,7 +247,7 @@ internal class BoomActionHandler(boomPage: BoomChipPage, enableFakeSelectBar: Bo
         val topSearchView: ImageView = mFakeSelectBar.findViewById(R.id.all_search)
         topSearchView.setOnClickListener { search(getSelectedText(), SEARCH_WEB) }
         val topDictView: ImageView = mFakeSelectBar.findViewById(R.id.all_dict)
-        topDictView.setOnClickListener { search(getSelectedText(), SEARCH_DICTIONARY) }
+        topDictView.setOnClickListener { handleDictOrAi(getSelectedText()) }
         val topShareView: ImageView = mFakeSelectBar.findViewById(R.id.all_share)
         topShareView.setOnClickListener { share() }
         val topCopyView: ImageView = mFakeSelectBar.findViewById(R.id.all_copy)

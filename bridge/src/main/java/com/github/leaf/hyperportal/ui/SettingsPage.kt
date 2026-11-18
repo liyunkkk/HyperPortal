@@ -279,6 +279,22 @@ fun SettingsPage(bottomPadding: Dp) {
             }
         }
 
+        // Group 4: AI 翻译与角色
+        item(key = "title_ai") {
+            SmallTitle(text = "AI 助手")
+        }
+        item(key = "card_ai") {
+            Card(modifier = Modifier.nextBlock()) {
+                ArrowPreference(
+                    title = "AI 翻译与自定义角色",
+                    summary = "配置 OpenAI / Claude 接口、模型列表与多角色预设",
+                    onClick = {
+                        context.startActivity(Intent(context, AiSettingsActivity::class.java))
+                    },
+                )
+            }
+        }
+
         item(key = "bottom_spacer") {
             Spacer(Modifier.height(24.dp))
         }
