@@ -2,6 +2,7 @@
 package com.github.leaf.hyperportal.data
 
 import android.content.Context
+import android.content.pm.PackageManager
 import androidx.compose.runtime.Immutable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -29,10 +30,19 @@ data class PortalStatus(
     /** SystemUI 悬浮层最近一次自报的时间，0 表示没报过。 */
     val systemUiSeenAt: Long = 0L,
     val aesHandshakes: List<PortalStatusStore.Handshake> = emptyList(),
+    /**
+     * `com.miui.contentcatcher`（打过补丁的 AES）此刻是否真的装在机器上。
+     *
+     * 这一项必须单独问 PackageManager，而不能从「有没有握过手」倒推：系统更新会把
+     * AES 连签名一起换掉，HyperOS 随后把它当无效包删掉，于是长按取词全线失效，
+     * 而 LSPosed 那两个钩子仍然显示「已注入」。只看握手的话，用户看到的只是
+     * 「尚未握手」，永远猜不到真正的原因是这个包没了。
+     */
+    val aesInstalled: Boolean = false,
     val masterSwitch: Boolean = true,
 ) {
     /** 至少有一个 App 里的 AES 桥和我们握过手。 */
-    val aesReady: Boolean get() = aesHandshakes.isNotEmpty()
+    val aesReady: Boolean get() = aesInstalled && aesHandshakes.isNotEmpty()
 
     /** 两个 LSPosed 钩子都在。 */
     val hooksReady: Boolean get() = systemServerReady && systemUiReady
@@ -88,9 +98,30 @@ object PortalStatusRepository {
             systemUiReady = targets?.any { it.isSystemUi() } == true || systemUiSeenAt > 0L,
             systemUiSeenAt = systemUiSeenAt,
             aesHandshakes = PortalStatusStore.readHandshakes(app),
+            aesInstalled = isAesInstalled(app),
             masterSwitch = config.masterSwitch,
         )
         last = status
         status
     }
+
+    /**
+     * 打过补丁的 AES 本体在不在。系统更新换了它的签名之后，HyperOS 会在下一次开机
+     * 扫描时把 `/data/app` 里那份连带删掉（`System package signature mismatch` 紧接着
+     * `no longer exists`），此后长按任何内容都不会再有任何反应。
+     */
+    private fun isAesInstalled(context: Context): Boolean = try {
+        // minSdk 34, so the PackageInfoFlags overload is always available and the
+        // deprecated int-flags variant is not needed.
+        context.packageManager.getPackageInfo(
+            AES_PACKAGE,
+            PackageManager.PackageInfoFlags.of(0L),
+        )
+        true
+    } catch (_: Throwable) {
+        false
+    }
+
+    /** 补丁作用的目标包名，与 AES 桥里的 `com.miui.contentcatcher` 保持一致。 */
+    private const val AES_PACKAGE = "com.miui.contentcatcher"
 }

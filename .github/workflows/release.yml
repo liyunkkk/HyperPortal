@@ -89,8 +89,29 @@ jobs:
               f.write(f'ALIAS\n{os.environ[\"KEY_ALIAS\"]}\nKEY_PASSWORD\n{os.environ[\"KEY_PASSWORD\"]}\nKEYSTORE_PASSWORD\n{os.environ[\"KEYSTORE_PASSWORD\"]}\n')
           "
           else
-            keytool -genkeypair -v -keystore .sign/my-release-key.jks -alias hyperportal -keyalg RSA -keysize 2048 -validity 10000 -storepass android123 -keypass android123 -dname "CN=HyperPortal, OU=Dev, O=HyperPortal, L=Beijing, S=Beijing, C=CN"
-            printf "ALIAS\nhyperportal\nKEY_PASSWORD\nandroid123\nKEYSTORE_PASSWORD\nandroid123\n" > .sign/qianming.txt
+            # No repository secrets: fall back to the keystore that is committed
+            # as PEM (signing/key.pem + signing/cert.pem). The signing identity
+            # must stay identical across every release, otherwise an over-install
+            # fails with INSTALL_FAILED_UPDATE_INCOMPATIBLE and LSPosed drops the
+            # module scope on the uninstall/reinstall workaround.
+            KS_ALIAS=$(sed -n 's/^ALIAS=//p' signing/credentials.txt)
+            KS_PASS=$(sed -n 's/^KEYSTORE_PASSWORD=//p' signing/credentials.txt)
+            KEY_PASS=$(sed -n 's/^KEY_PASSWORD=//p' signing/credentials.txt)
+            openssl pkcs12 -export \
+              -inkey signing/key.pem \
+              -in signing/cert.pem \
+              -name "$KS_ALIAS" \
+              -passout "pass:$KS_PASS" \
+              -out .sign/ci.p12
+            keytool -importkeystore -noprompt \
+              -srckeystore .sign/ci.p12 -srcstoretype PKCS12 \
+              -srcstorepass "$KS_PASS" \
+              -destkeystore .sign/my-release-key.jks -deststoretype JKS \
+              -deststorepass "$KS_PASS" -destkeypass "$KEY_PASS" \
+              -alias "$KS_ALIAS"
+            printf 'ALIAS\n%s\nKEY_PASSWORD\n%s\nKEYSTORE_PASSWORD\n%s\n' \
+              "$KS_ALIAS" "$KEY_PASS" "$KS_PASS" > .sign/qianming.txt
+            keytool -list -keystore .sign/my-release-key.jks -storepass "$KS_PASS"
           fi
 
       - name: Grant Execute Permissions

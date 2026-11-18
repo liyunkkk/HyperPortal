@@ -233,9 +233,13 @@ private fun PortalStatusCard(
     val paused = checked && !status.masterSwitch
     val unknown = checked && !paused && !status.serviceBound
     val ready = checked && !paused && !unknown && status.allReady
-    val hooksOnly = checked && !paused && !unknown && status.hooksReady && !status.aesReady
-    val problem = checked && !paused && !unknown && !status.hooksReady
-    val attention = paused || unknown || hooksOnly
+    // AES 本体被系统更新删掉时，两个 LSPosed 钩子往往还在，只有这一项能说明
+    // 长按为什么彻底没反应；它的优先级高于「等待握手」。
+    val aesMissing = checked && !paused && !unknown && !status.aesInstalled
+    val hooksOnly = checked && !paused && !unknown && !aesMissing &&
+        status.hooksReady && !status.aesReady
+    val problem = checked && !paused && !unknown && !aesMissing && !status.hooksReady
+    val attention = paused || unknown || aesMissing || hooksOnly
 
     val dark = isSystemInDarkTheme()
     val dynamic = MiuixTheme.isDynamicColor
@@ -272,6 +276,7 @@ private fun PortalStatusCard(
         paused -> "已暂停运行"
         unknown -> "无法确认状态"
         ready -> "HyperPortal 已激活"
+        aesMissing -> "AES 补丁包未安装"
         hooksOnly -> "等待 AES 握手"
         problem -> "HyperPortal 未激活"
         else -> "正在检查…"
@@ -280,6 +285,7 @@ private fun PortalStatusCard(
         paused -> "功能总开关已关闭，长按内容不会触发传送门"
         unknown -> "LSPosed 服务未连接，查不到钩子被注入到了哪些进程"
         ready -> "三段钩子全部就绪"
+        aesMissing -> "长按取词依赖 com.miui.contentcatcher，该包已不在设备上，请重新安装 AES 补丁包"
         hooksOnly -> "钩子已注入，长按任意应用里的内容即可完成握手"
         problem -> "LSPosed 中没有找到已注入的进程，请检查模块是否启用"
         else -> "正在询问 LSPosed 与 AES 桥"
@@ -287,6 +293,7 @@ private fun PortalStatusCard(
     // 卡片左下角那一行：与右下角的大图标斜对角平衡。没有可说的就不放。
     val mode = when {
         ready -> status.frameworkName.ifBlank { "LSPosed" }
+        aesMissing -> "需要补丁包"
         hooksOnly -> "等待握手"
         else -> null
     }
@@ -380,6 +387,7 @@ private fun systemUiSummary(status: PortalStatus): String {
 }
 
 private fun aesSummary(context: Context, status: PortalStatus): String {
+    if (!status.aesInstalled) return "未安装（com.miui.contentcatcher 不在设备上）"
     val last = status.lastHandshake ?: return "尚未握手"
     val label = appLabel(context, last.packageName)
     val when_ = relativeTime(last.atMillis)
