@@ -742,6 +742,19 @@ public final class PortalSystemUiModule {
         }
     }
 
+    public static void teardownForHotReload() {
+        SystemUiOverlay overlay = sOverlay;
+        sOverlay = null;
+        if (overlay != null) {
+            Runnable cleanup = overlay::teardown;
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                cleanup.run();
+            } else {
+                sHandler.post(cleanup);
+            }
+        }
+    }
+
     private static void initOverlay(Context context) {
         if (context == null || sOverlay != null) {
             return;
@@ -782,6 +795,8 @@ public final class PortalSystemUiModule {
         private final WindowManager mWindowManager;
         private FrameLayout mContainer;
         private WindowManager.LayoutParams mParams;
+        private BroadcastReceiver mDragReceiver;
+        private BroadcastReceiver mRestartReceiver;
         private GlowView mGlowView;
         private ColorOSDockBar mDockBar;
         private final List<AppTarget> mTargets = new ArrayList<>();
@@ -2086,6 +2101,28 @@ public final class PortalSystemUiModule {
             sHandler.post(() -> toast(msg));
         }
 
+        public void teardown() {
+            if (mDockBar != null) {
+                mDockBar.animate().cancel();
+                mDockBar.stopAutoScroll();
+            }
+            hideOverlay();
+            if (mDragReceiver != null) {
+                try {
+                    mContext.unregisterReceiver(mDragReceiver);
+                } catch (Throwable ignored) {
+                }
+                mDragReceiver = null;
+            }
+            if (mRestartReceiver != null) {
+                try {
+                    mContext.unregisterReceiver(mRestartReceiver);
+                } catch (Throwable ignored) {
+                }
+                mRestartReceiver = null;
+            }
+        }
+
         public void registerReceivers() {
             IntentFilter filter = new IntentFilter();
             filter.addAction(ACTION_DRAG_STATE);
@@ -2100,7 +2137,7 @@ public final class PortalSystemUiModule {
             filter.addAction(Intent.ACTION_USER_UNLOCKED);
             filter.addAction(Intent.ACTION_BOOT_COMPLETED);
             if (Build.VERSION.SDK_INT >= 33) {
-                mContext.registerReceiver(new BroadcastReceiver() {
+                mDragReceiver = new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
                         try {
@@ -2110,9 +2147,10 @@ public final class PortalSystemUiModule {
                             Log.e(TAG, "handleIntent failed in SystemUI", t);
                         }
                     }
-                }, filter, Context.RECEIVER_EXPORTED);
+                };
+                mContext.registerReceiver(mDragReceiver, filter, Context.RECEIVER_EXPORTED);
             } else {
-                mContext.registerReceiver(new BroadcastReceiver() {
+                mDragReceiver = new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
                         try {
@@ -2121,14 +2159,15 @@ public final class PortalSystemUiModule {
                             Log.e(TAG, "handleIntent failed in SystemUI", t);
                         }
                     }
-                }, filter);
+                };
+                mContext.registerReceiver(mDragReceiver, filter);
             }
             // Home-page restart button. Only the HyperPortal app (or the
             // system) may ask SystemUI to recycle itself; the actual kill is
             // posted so the broadcast returns before the process dies.
             IntentFilter restartFilter = new IntentFilter(
                     com.github.leaf.hyperportal.PortalShareContract.ACTION_RESTART_SYSTEMUI);
-            BroadcastReceiver restartReceiver = new BroadcastReceiver() {
+            mRestartReceiver = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
                     int uid = getSentFromUid();
@@ -2147,9 +2186,9 @@ public final class PortalSystemUiModule {
                 }
             };
             if (Build.VERSION.SDK_INT >= 33) {
-                mContext.registerReceiver(restartReceiver, restartFilter, Context.RECEIVER_EXPORTED);
+                mContext.registerReceiver(mRestartReceiver, restartFilter, Context.RECEIVER_EXPORTED);
             } else {
-                mContext.registerReceiver(restartReceiver, restartFilter);
+                mContext.registerReceiver(mRestartReceiver, restartFilter);
             }
         }
 
@@ -2433,8 +2472,12 @@ public final class PortalSystemUiModule {
                     mGlowView.setVisibility(View.GONE);
                 }
                 if (mDockBar != null) {
+                    mDockBar.animate().cancel();
                     mDockBar.stopAutoScroll();
                     mDockBar.resetMagnification(false);
+                    mDockBar.setTranslationX(0f);
+                    mDockBar.setTranslationY(0f);
+                    mDockBar.setAlpha(1f);
                     mDockBar.setVisibility(View.GONE);
                 }
                 hideOverlay();
@@ -2474,6 +2517,7 @@ public final class PortalSystemUiModule {
                     mGlowView.setVisibility(View.VISIBLE);
                 }
                 if (mDockBar != null && mDockBar.getVisibility() == View.VISIBLE) {
+                    mDockBar.animate().cancel();
                     mDockBar.stopAutoScroll();
                     if (isRight) {
                         mDockBar.animate()
@@ -2481,7 +2525,9 @@ public final class PortalSystemUiModule {
                                 .alpha(0f)
                                 .setDuration(160)
                                 .withEndAction(() -> {
-                                    if (mDockBar != null) mDockBar.setVisibility(View.GONE);
+                                    if (mDockBar != null && mCurrentState != 2) {
+                                        mDockBar.setVisibility(View.GONE);
+                                    }
                                 })
                                 .start();
                     } else {
@@ -2490,7 +2536,9 @@ public final class PortalSystemUiModule {
                                 .alpha(0f)
                                 .setDuration(160)
                                 .withEndAction(() -> {
-                                    if (mDockBar != null) mDockBar.setVisibility(View.GONE);
+                                    if (mDockBar != null && mCurrentState != 2) {
+                                        mDockBar.setVisibility(View.GONE);
+                                    }
                                 })
                                 .start();
                     }
@@ -2504,6 +2552,7 @@ public final class PortalSystemUiModule {
                     mGlowView.setVisibility(View.VISIBLE);
                 }
                 if (mDockBar != null) {
+                    mDockBar.animate().cancel();
                     if (mDockBar.getVisibility() != View.VISIBLE) {
                         mDockBar.resetScroll();
                         mDockBar.setVisibility(View.VISIBLE);

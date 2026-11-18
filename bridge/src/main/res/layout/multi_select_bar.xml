@@ -1,48 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginLeft="@dimen/page_margin_left"
-        android:layout_marginRight="@dimen/page_margin_right"
-        android:background="@drawable/boom_liquid_bar_bg"
-        android:orientation="horizontal"
-        android:visibility="invisible">
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginLeft="@dimen/page_margin_left"
+    android:layout_marginRight="@dimen/page_margin_right"
+    android:background="@drawable/boom_liquid_bar_bg"
+    android:elevation="6dp"
+    android:paddingLeft="8dp"
+    android:paddingTop="5dp"
+    android:paddingRight="8dp"
+    android:paddingBottom="5dp"
+    android:visibility="invisible">
 
     <ImageView
-            android:id="@+id/all_search"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentLeft="true"
-            android:src="@drawable/boom_chips_all_search" />
+        android:id="@+id/all_search"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_alignParentLeft="true"
+        android:background="@drawable/boom_liquid_bar_btn_bg"
+        android:padding="8dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/boom_liquid_icon_search" />
 
     <ImageView
-            android:id="@+id/all_dict"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_toRightOf="@+id/all_search"
-            android:src="@drawable/boom_chips_all_dict" />
+        android:id="@+id/all_dict"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_marginLeft="6dp"
+        android:layout_toRightOf="@+id/all_search"
+        android:background="@drawable/boom_liquid_bar_ai_bg"
+        android:elevation="2dp"
+        android:padding="8dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/boom_liquid_icon_ai" />
 
     <ImageView
-            android:id="@+id/all_cut"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_toRightOf="@+id/all_dict"
-            android:src="@drawable/boom_chips_all_cut" />
+        android:id="@+id/all_cut"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_marginLeft="6dp"
+        android:layout_toRightOf="@+id/all_dict"
+        android:background="@drawable/boom_liquid_bar_btn_bg"
+        android:padding="8dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/boom_liquid_icon_cut" />
 
     <ImageView
-            android:id="@+id/all_share"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginRight="4dp"
-            android:layout_toLeftOf="@+id/all_copy"
-            android:src="@drawable/boom_chips_all_share" />
+        android:id="@+id/all_share"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_marginLeft="6dp"
+        android:layout_toRightOf="@+id/all_cut"
+        android:background="@drawable/boom_liquid_bar_btn_bg"
+        android:padding="8dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/boom_liquid_icon_share" />
 
     <ImageView
-            android:id="@+id/all_copy"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentRight="true"
-            android:layout_marginRight="1dp"
-            android:src="@drawable/boom_chips_all_copy" />
+        android:id="@+id/all_copy"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_marginLeft="6dp"
+        android:layout_toRightOf="@+id/all_share"
+        android:background="@drawable/boom_liquid_bar_btn_bg"
+        android:padding="8dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/boom_liquid_icon_copy" />
 </RelativeLayout>

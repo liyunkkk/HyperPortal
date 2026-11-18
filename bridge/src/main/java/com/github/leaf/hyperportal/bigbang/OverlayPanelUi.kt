@@ -8,10 +8,13 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
+import android.view.View
 import android.widget.ImageView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -26,16 +29,26 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Outline
@@ -43,6 +56,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalConfiguration
@@ -56,6 +70,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 private val OverlayBottomBarContentOffset = (-2).dp
 
@@ -92,11 +107,19 @@ internal fun FloatingPanel(
     fillMax: Boolean = false,
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(22.dp),
+    cornerRadius: Dp = 22.dp,
+    backdropBlurRadius: Dp = 0.dp,
     backgroundColor: Color,
+    fallbackBackgroundColor: Color = backgroundColor,
+    backgroundBrush: Brush? = null,
+    fallbackBackgroundBrush: Brush? = null,
     borderColor: Color = Color.Transparent,
+    innerTopHighlightColor: Color = Color.Transparent,
+    innerBottomHighlightColor: Color = Color.Transparent,
     shadowColor: Color? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    var blurActive by remember { mutableStateOf(false) }
     Box(
         modifier = if (fillMax) {
             modifier.fillMaxSize()
@@ -123,14 +146,107 @@ internal fun FloatingPanel(
                     onClick = {},
                 ),
             shape = shape,
-            color = backgroundColor,
-            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+            color = Color.Transparent,
+            border = androidx.compose.foundation.BorderStroke(1.2.dp, borderColor),
             tonalElevation = 0.dp,
             shadowElevation = 0.dp,
         ) {
-            Box(modifier = Modifier.fillMaxSize(), content = content)
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (backdropBlurRadius > 0.dp) {
+                    LocalWindowBlurBackdrop(
+                        blurRadius = backdropBlurRadius,
+                        cornerRadius = cornerRadius,
+                        onBlurAvailable = { blurActive = it },
+                    )
+                }
+                val activeBrush = if (blurActive) backgroundBrush else (fallbackBackgroundBrush ?: backgroundBrush)
+                val activeColor = if (blurActive) backgroundColor else fallbackBackgroundColor
+                val fillModifier = if (activeBrush != null) {
+                    Modifier.background(activeBrush)
+                } else {
+                    Modifier.background(activeColor)
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(fillModifier)
+                        .drawBehind {
+                            if (innerTopHighlightColor != Color.Transparent) {
+                                val stroke = 1.5.dp.toPx()
+                                drawLine(
+                                    color = innerTopHighlightColor,
+                                    start = Offset(0f, stroke * 0.5f),
+                                    end = Offset(size.width, stroke * 0.5f),
+                                    strokeWidth = stroke,
+                                )
+                            }
+                            if (innerBottomHighlightColor != Color.Transparent) {
+                                val stroke = 1.dp.toPx()
+                                drawLine(
+                                    color = innerBottomHighlightColor,
+                                    start = Offset(0f, size.height - stroke * 0.5f),
+                                    end = Offset(size.width, size.height - stroke * 0.5f),
+                                    strokeWidth = stroke,
+                                )
+                            }
+                        },
+                    content = content,
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun LocalWindowBlurBackdrop(
+    blurRadius: Dp,
+    cornerRadius: Dp,
+    onBlurAvailable: (Boolean) -> Unit,
+) {
+    val density = LocalDensity.current
+    val blurRadiusPx = with(density) { blurRadius.toPx().roundToInt().coerceAtLeast(0) }
+    val cornerRadiusPx = with(density) { cornerRadius.toPx().coerceAtLeast(0f) }
+    val latestBlurPx by rememberUpdatedState(blurRadiusPx)
+    val latestCornerPx by rememberUpdatedState(cornerRadiusPx)
+    val latestOnBlur by rememberUpdatedState(onBlurAvailable)
+
+    AndroidView(
+        modifier = Modifier.fillMaxSize(),
+        factory = { context ->
+            View(context).apply {
+                clipToOutline = true
+                addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                    override fun onViewAttachedToWindow(v: View) {
+                        v.post {
+                            if (v.isAttachedToWindow) {
+                                LocalWindowBlur.installBackdrop(
+                                    view = v,
+                                    blurRadiusPx = latestBlurPx,
+                                    cornerRadiusPx = latestCornerPx,
+                                    onResult = latestOnBlur,
+                                )
+                            }
+                        }
+                    }
+
+                    override fun onViewDetachedFromWindow(v: View) {
+                        LocalWindowBlur.clear(v)
+                        latestOnBlur(false)
+                    }
+                })
+            }
+        },
+        update = { view ->
+            if (view.isAttachedToWindow) {
+                LocalWindowBlur.installBackdrop(
+                    view = view,
+                    blurRadiusPx = blurRadiusPx,
+                    cornerRadiusPx = cornerRadiusPx,
+                    onResult = onBlurAvailable,
+                )
+            }
+        },
+    )
 }
 
 internal data class OverlayPanelMetrics(
@@ -242,38 +358,50 @@ internal fun OverlayHeaderBar(
     topInset: Dp = 0.dp,
     leftInset: Dp = 0.dp,
     rightInset: Dp = 0.dp,
+    dividerColor: Color? = null,
     leading: @Composable RowScope.() -> Unit,
     center: @Composable BoxScope.() -> Unit,
     trailing: @Composable RowScope.() -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(52.dp + topInset)
-            .background(backgroundColor)
-            .absolutePadding(
-                left = 14.dp + leftInset,
-                top = topInset,
-                right = 14.dp + rightInset,
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    val dark = isSystemInDarkTheme()
+    val resolvedDividerColor = dividerColor
+        ?: if (dark) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.92f)
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp + topInset)
+                .background(backgroundColor)
+                .absolutePadding(
+                    left = 14.dp + leftInset,
+                    top = topInset,
+                    right = 14.dp + rightInset,
+                ),
             verticalAlignment = Alignment.CenterVertically,
-            content = leading,
-        )
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                content = leading,
+            )
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.Center,
+                content = center,
+            )
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
+                content = trailing,
+            )
+        }
         Box(
-            modifier = Modifier.weight(1f),
-            contentAlignment = Alignment.Center,
-            content = center,
-        )
-        Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-            verticalAlignment = Alignment.CenterVertically,
-            content = trailing,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(resolvedDividerColor),
         )
     }
 }
@@ -284,43 +412,55 @@ internal fun OverlayBottomBar(
     bottomInset: Dp = 0.dp,
     leftInset: Dp = 0.dp,
     rightInset: Dp = 0.dp,
+    dividerColor: Color? = null,
     leading: @Composable BoxScope.() -> Unit = {},
     center: @Composable BoxScope.() -> Unit = {},
     trailing: @Composable BoxScope.() -> Unit = {},
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(52.dp + bottomInset)
-            .background(backgroundColor)
-            .absolutePadding(
-                left = 14.dp + leftInset,
-                right = 14.dp + rightInset,
-                bottom = bottomInset,
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    val dark = isSystemInDarkTheme()
+    val resolvedDividerColor = dividerColor
+        ?: if (dark) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.92f)
+    Column(modifier = Modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
-                .requiredWidth(72.dp)
-                .offset(y = OverlayBottomBarContentOffset),
-            contentAlignment = Alignment.CenterStart,
-            content = leading,
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(resolvedDividerColor),
         )
-        Box(
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .offset(y = OverlayBottomBarContentOffset),
-            contentAlignment = Alignment.Center,
-            content = center,
-        )
-        Box(
-            modifier = Modifier
-                .requiredWidth(72.dp)
-                .offset(y = OverlayBottomBarContentOffset),
-            contentAlignment = Alignment.CenterEnd,
-            content = trailing,
-        )
+                .fillMaxWidth()
+                .height(52.dp + bottomInset)
+                .background(backgroundColor)
+                .absolutePadding(
+                    left = 16.dp + leftInset,
+                    right = 16.dp + rightInset,
+                    bottom = bottomInset,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .requiredWidth(72.dp)
+                    .offset(y = OverlayBottomBarContentOffset),
+                contentAlignment = Alignment.CenterStart,
+                content = leading,
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .offset(y = OverlayBottomBarContentOffset),
+                contentAlignment = Alignment.Center,
+                content = center,
+            )
+            Box(
+                modifier = Modifier
+                    .requiredWidth(72.dp)
+                    .offset(y = OverlayBottomBarContentOffset),
+                contentAlignment = Alignment.CenterEnd,
+                content = trailing,
+            )
+        }
     }
 }
 
@@ -367,10 +507,25 @@ internal fun OverlayIconAction(
     onClick: () -> Unit,
     contentDescription: String,
 ) {
+    val dark = isSystemInDarkTheme()
+    val pillBg = if (dark) {
+        Color.White.copy(alpha = 0.11f)
+    } else {
+        Color.White.copy(alpha = 0.68f)
+    }
+    val pillBorder = if (dark) {
+        Color.White.copy(alpha = 0.22f)
+    } else {
+        Color.White.copy(alpha = 0.95f)
+    }
     Box(
         modifier = Modifier
             .requiredWidth(36.dp)
             .requiredHeight(36.dp)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.72f }
+            .clip(CircleShape)
+            .background(pillBg)
+            .border(1.dp, pillBorder, CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -383,6 +538,7 @@ internal fun OverlayIconAction(
             imageVector = imageVector,
             contentDescription = contentDescription,
             tint = tint,
+            modifier = Modifier.size(18.dp),
         )
     }
 }

@@ -15,11 +15,13 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.ViewGroup
 import android.view.Window
+import android.view.WindowManager
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import com.github.leaf.hyperportal.bigbang.LocalWindowBlur
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -40,21 +42,42 @@ object AiTranslateDialog {
             context.resources.displayMetrics,
         ).toInt()
 
-        val glassBgColor = if (isDark) Color.parseColor("#E01A202C") else Color.parseColor("#E6F8FAFF")
-        val glassChipBg = if (isDark) Color.parseColor("#1FFFFFFF") else Color.parseColor("#99FFFFFF")
-        val glassBorderColor = if (isDark) Color.parseColor("#33FFFFFF") else Color.parseColor("#CCFFFFFF")
-        val activeBlue = if (isDark) Color.parseColor("#CC3898FF") else Color.parseColor("#DD0D84FF")
-        val textMain = if (isDark) Color.parseColor("#F3F6FC") else Color.parseColor("#111827")
-        val textSub = if (isDark) Color.parseColor("#9AA6B8") else Color.parseColor("#5B6475")
+        val frostedModalBg = if (isDark) Color.parseColor("#E6181E2A") else Color.parseColor("#E0F7FAFF")
+        val fallbackModalBg = if (isDark) Color.parseColor("#F5181E2A") else Color.parseColor("#F5F7FAFF")
+        val glassBtnBg = if (isDark) Color.parseColor("#1CFFFFFF") else Color.parseColor("#ADFFFFFF")
+        val glassBtnBorder = if (isDark) Color.parseColor("#38FFFFFF") else Color.parseColor("#F2FFFFFF")
+        val glassPanelBorder = if (isDark) Color.parseColor("#38FFFFFF") else Color.parseColor("#EBFFFFFF")
+        val activeStartColor = if (isDark) Color.parseColor("#F0409CFF") else Color.parseColor("#F02394FF")
+        val activeEndColor = if (isDark) Color.parseColor("#F01C7EFF") else Color.parseColor("#F00A7AFF")
+        val activeBorderColor = if (isDark) Color.parseColor("#8CFFFFFF") else Color.parseColor("#73FFFFFF")
+        val textMain = if (isDark) Color.parseColor("#F1F5F9") else Color.parseColor("#0F172A")
+        val textSub = if (isDark) Color.parseColor("#94A3B8") else Color.parseColor("#64748B")
+
+        fun buildModalBackground(bgColor: Int): GradientDrawable = GradientDrawable().apply {
+            cornerRadius = dp(28).toFloat()
+            setColor(bgColor)
+            setStroke(dp(1), glassPanelBorder)
+        }
+
+        fun buildActivePillBackground(): GradientDrawable = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(activeStartColor, activeEndColor),
+        ).apply {
+            cornerRadius = dp(999).toFloat()
+            setStroke(dp(1), activeBorderColor)
+        }
 
         val card = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(18), dp(18), dp(16))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(26).toFloat()
-                setColor(glassBgColor)
-                setStroke(dp(1), glassBorderColor)
-            }
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+            clipToOutline = true
+        }
+        LocalWindowBlur.attachLayeredBackground(
+            view = card,
+            blurRadiusPx = dp(44),
+            cornerRadiusPx = dp(28).toFloat(),
+        ) {
+            buildModalBackground(frostedModalBg) to buildModalBackground(fallbackModalBg)
         }
 
         val headerRow = LinearLayout(context).apply {
@@ -64,7 +87,7 @@ object AiTranslateDialog {
         }
         val titleTv = TextView(context).apply {
             text = "AI 助手"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             setTextColor(textMain)
             paint.isFakeBoldText = true
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
@@ -93,40 +116,40 @@ object AiTranslateDialog {
             maxLines = 2
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(textSub)
-            setPadding(dp(12), dp(8), dp(12), dp(8))
+            setPadding(dp(12), dp(10), dp(12), dp(10))
             background = GradientDrawable().apply {
-                cornerRadius = dp(12).toFloat()
-                setColor(glassChipBg)
-                setStroke(dp(1), glassBorderColor)
+                cornerRadius = dp(14).toFloat()
+                setColor(glassBtnBg)
+                setStroke(dp(1), glassBtnBorder)
             }
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply {
                 topMargin = dp(12)
-                bottomMargin = dp(10)
+                bottomMargin = dp(12)
             }
         }
         card.addView(sourcePreview)
 
         val resultScroll = ScrollView(context).apply {
             background = GradientDrawable().apply {
-                cornerRadius = dp(16).toFloat()
-                setColor(glassChipBg)
-                setStroke(dp(1), glassBorderColor)
+                cornerRadius = dp(14).toFloat()
+                setColor(glassBtnBg)
+                setStroke(dp(1), glassBtnBorder)
             }
             setPadding(dp(12), dp(10), dp(12), dp(10))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(210),
+                dp(190),
             )
         }
         val resultText = TextView(context).apply {
             text = "正在连接 ${config.effectiveModel()}..."
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setTextColor(textMain)
             setTextIsSelectable(true)
-            setLineSpacing(dp(4).toFloat(), 1f)
+            setLineSpacing(dp(4).toFloat(), 1.15f)
         }
         resultScroll.addView(resultText)
         card.addView(resultScroll)
@@ -134,7 +157,7 @@ object AiTranslateDialog {
         val actionsRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.END
-            setPadding(0, dp(14), 0, 0)
+            setPadding(0, dp(12), 0, 0)
         }
         val closeBtn = TextView(context).apply {
             text = "关闭"
@@ -144,8 +167,8 @@ object AiTranslateDialog {
             setPadding(dp(18), dp(8), dp(18), dp(8))
             background = GradientDrawable().apply {
                 cornerRadius = dp(999).toFloat()
-                setColor(glassChipBg)
-                setStroke(dp(1), glassBorderColor)
+                setColor(glassBtnBg)
+                setStroke(dp(1), glassBtnBorder)
             }
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -160,20 +183,21 @@ object AiTranslateDialog {
             setTextColor(Color.WHITE)
             paint.isFakeBoldText = true
             setPadding(dp(18), dp(8), dp(18), dp(8))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(999).toFloat()
-                setColor(activeBlue)
-            }
+            background = buildActivePillBackground()
         }
         actionsRow.addView(closeBtn)
         actionsRow.addView(copyBtn)
         card.addView(actionsRow)
 
         fun styleRoleChip(chip: TextView, selected: Boolean) {
-            chip.background = GradientDrawable().apply {
-                cornerRadius = dp(999).toFloat()
-                setColor(if (selected) activeBlue else glassChipBg)
-                setStroke(dp(1), glassBorderColor)
+            chip.background = if (selected) {
+                buildActivePillBackground()
+            } else {
+                GradientDrawable().apply {
+                    cornerRadius = dp(999).toFloat()
+                    setColor(glassBtnBg)
+                    setStroke(dp(1), glassBtnBorder)
+                }
             }
             chip.setTextColor(if (selected) Color.WHITE else textMain)
         }
@@ -247,11 +271,15 @@ object AiTranslateDialog {
         val dialog = Dialog(context).apply {
             requestWindowFeature(Window.FEATURE_NO_TITLE)
             setContentView(card)
-            window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            window?.setLayout(
-                (context.resources.displayMetrics.widthPixels * 0.90f).toInt(),
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            )
+            window?.let { w ->
+                w.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                w.setDimAmount(if (isDark) 0.44f else 0.22f)
+                w.setLayout(
+                    (context.resources.displayMetrics.widthPixels * 0.90f).toInt(),
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                )
+            }
             setOnDismissListener { cancelled.set(true) }
         }
 

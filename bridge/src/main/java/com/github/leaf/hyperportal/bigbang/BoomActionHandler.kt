@@ -227,6 +227,7 @@ internal class BoomActionHandler(boomPage: BoomChipPage, enableFakeSelectBar: Bo
     private fun initViews(contentView: View) {
         mSelectRect = contentView.findViewById(R.id.boom_multi_selected_bg)
         mSelectBar = contentView.findViewById(R.id.multi_selected_bar)
+        installActionBarGlassBlur(mSelectBar)
         mSelectBar.viewTreeObserver.addOnGlobalLayoutListener { onScrollChanged() }
         val searchView: ImageView = mSelectBar.findViewById(R.id.all_search)
         val resegmentView: ImageView = mSelectBar.findViewById(R.id.all_cut)
@@ -242,6 +243,7 @@ internal class BoomActionHandler(boomPage: BoomChipPage, enableFakeSelectBar: Bo
 
     private fun initFakeViews(contentView: View) {
         mFakeSelectBar = contentView.findViewById(R.id.fake_multi_selected_bar)
+        installActionBarGlassBlur(mFakeSelectBar)
         val topResegmentView: ImageView = mFakeSelectBar.findViewById(R.id.all_cut)
         topResegmentView.setOnClickListener { mBoomPage.splitSelectedWordsToChars() }
         val topSearchView: ImageView = mFakeSelectBar.findViewById(R.id.all_search)
@@ -252,6 +254,24 @@ internal class BoomActionHandler(boomPage: BoomChipPage, enableFakeSelectBar: Bo
         topShareView.setOnClickListener { share() }
         val topCopyView: ImageView = mFakeSelectBar.findViewById(R.id.all_copy)
         topCopyView.setOnClickListener { copy(getSelectedText()) }
+    }
+
+    private fun installActionBarGlassBlur(bar: View) {
+        val dm = bar.resources.displayMetrics
+        val blurPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 24f, dm).toInt()
+        val cornerPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 24f, dm)
+        bar.clipToOutline = true
+        LocalWindowBlur.attachLayeredBackground(
+            view = bar,
+            blurRadiusPx = blurPx,
+            cornerRadiusPx = cornerPx,
+        ) {
+            val drawable = androidx.core.content.ContextCompat.getDrawable(
+                bar.context,
+                R.drawable.boom_liquid_bar_bg,
+            )!!
+            drawable to drawable
+        }
     }
 
     fun hasSelection(): Boolean = mSelectedId.size > 0

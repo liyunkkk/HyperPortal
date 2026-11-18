@@ -26,13 +26,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DocumentScanner
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Language
-import androidx.compose.material.icons.outlined.MoreHoriz
-import androidx.compose.material.icons.outlined.SelectAll
-import androidx.compose.material.icons.outlined.Share
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -42,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -276,12 +270,32 @@ private fun BigBangOverlayContent(
 ) {
     val dark = isSystemInDarkTheme()
     val panelMetrics = rememberOverlayPanelMetrics()
-    val panelBackground = if (dark) Color(0xEA161B24) else Color(0xEAF2F6FD)
-    val panelBorder = if (dark) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.88f)
-    val topBarColor = if (dark) Color(0x66222938) else Color(0xB8FFFFFF)
-    val bottomBarColor = if (dark) Color(0x66222938) else Color(0xB8FFFFFF)
-    val scrimColor = if (dark) Color.Black.copy(alpha = 0.42f) else Color.Black.copy(alpha = 0.24f)
-    val shadowColor = Color.Black.copy(alpha = 0.36f)
+    val panelBackground = if (dark) Color(0xE0181E2A) else Color(0xE0F6F9FF)
+    val panelFallbackBackground = if (dark) Color(0xF5181E2A) else Color(0xF5F6F9FF)
+    val panelBrush = remember(dark) {
+        if (dark) {
+            Brush.verticalGradient(listOf(Color(0xE0181E2A), Color(0xD6121722)))
+        } else {
+            Brush.verticalGradient(listOf(Color(0xE0F6F9FF), Color(0xD6EBF1FC)))
+        }
+    }
+    val panelFallbackBrush = remember(dark) {
+        if (dark) {
+            Brush.verticalGradient(listOf(Color(0xF5181E2A), Color(0xF0121722)))
+        } else {
+            Brush.verticalGradient(listOf(Color(0xF5F6F9FF), Color(0xF0EBF1FC)))
+        }
+    }
+    val panelBorder = if (dark) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.92f)
+    val innerTopHighlight = if (dark) Color.White.copy(alpha = 0.26f) else Color.White.copy(alpha = 0.95f)
+    val innerBottomHighlight = if (dark) Color.White.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.45f)
+    val topBarColor = if (dark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.56f)
+    val bottomBarColor = if (dark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.56f)
+    val scrimColor = if (dark) Color.Black.copy(alpha = 0.46f) else Color(0xFF0F172A).copy(alpha = 0.24f)
+    val shadowColor = if (dark) Color.Black.copy(alpha = 0.55f) else Color(0xFF0F172A).copy(alpha = 0.24f)
+    val iconTint = if (dark) Color(0xFFE2E8F0) else Color(0xFF334155)
+    val mutedIconTint = if (dark) Color(0xFFE2E8F0).copy(alpha = 0.32f) else Color(0xFF334155).copy(alpha = 0.35f)
+    val titleColor = if (dark) Color(0xFFF1F5F9) else Color(0xFF0F172A)
     val panelShape = androidx.compose.foundation.shape.RoundedCornerShape(panelMetrics.cornerRadius)
     var panelVisible by remember { mutableStateOf(false) }
     var dismissing by remember { mutableStateOf(false) }
@@ -349,8 +363,15 @@ private fun BigBangOverlayContent(
                     this.transformOrigin = transformOrigin
                 },
             shape = panelShape,
+            cornerRadius = panelMetrics.cornerRadius,
+            backdropBlurRadius = 42.dp * enterProgress,
             backgroundColor = panelBackground,
+            fallbackBackgroundColor = panelFallbackBackground,
+            backgroundBrush = panelBrush,
+            fallbackBackgroundBrush = panelFallbackBrush,
             borderColor = panelBorder,
+            innerTopHighlightColor = innerTopHighlight,
+            innerBottomHighlightColor = innerBottomHighlight,
             shadowColor = if (panelMetrics.multiWindow) null else shadowColor,
         ) {
             OverlayPanelScaffold(
@@ -360,16 +381,17 @@ private fun BigBangOverlayContent(
                         topInset = panelMetrics.topSystemInset,
                         leftInset = panelMetrics.leftSystemInset,
                         rightInset = panelMetrics.rightSystemInset,
+                        dividerColor = panelBorder,
                         leading = {
                             OverlayIconAction(
-                                imageVector = Icons.Outlined.Edit,
-                                tint = if (dark) Color(0xFFD7DEE7) else Color(0xFF6F6962),
+                                imageVector = LiquidGlassIcons.Edit,
+                                tint = iconTint,
                                 onClick = onEditMode,
                                 contentDescription = stringResource(R.string.bigbang_action_edit),
                             )
                             OverlayIconAction(
-                                imageVector = Icons.Outlined.SelectAll,
-                                tint = if (dark) Color(0xFFF2F5F8) else Color(0xFF6C6760),
+                                imageVector = LiquidGlassIcons.SelectAll,
+                                tint = iconTint,
                                 onClick = onSelectAll,
                                 contentDescription = stringResource(R.string.bigbang_action_select_all),
                             )
@@ -377,21 +399,21 @@ private fun BigBangOverlayContent(
                         center = {
                             androidx.compose.material3.Text(
                                 text = stringResource(R.string.bigbang_overlay_title),
-                                color = if (dark) Color(0xFFF3F6FC) else Color(0xFF1E293B),
-                                fontSize = 18.sp,
+                                color = titleColor,
+                                fontSize = 17.sp,
                                 fontWeight = FontWeight.SemiBold,
                             )
                         },
                         trailing = {
                             OverlayIconAction(
-                                imageVector = Icons.Outlined.Share,
-                                tint = if (dark) Color(0xFFF2F5F8) else Color(0xFF6C6760),
+                                imageVector = LiquidGlassIcons.Share,
+                                tint = iconTint,
                                 onClick = onShareAll,
                                 contentDescription = stringResource(R.string.bigbang_action_share_all),
                             )
                             OverlayIconAction(
-                                imageVector = Icons.Outlined.MoreHoriz,
-                                tint = if (dark) Color(0xFFD7DEE7) else Color(0xFF6F6962),
+                                imageVector = LiquidGlassIcons.More,
+                                tint = iconTint,
                                 onClick = onMore,
                                 contentDescription = stringResource(R.string.bigbang_action_more),
                             )
@@ -404,10 +426,11 @@ private fun BigBangOverlayContent(
                         bottomInset = panelMetrics.bottomSystemInset,
                         leftInset = panelMetrics.leftSystemInset,
                         rightInset = panelMetrics.rightSystemInset,
+                        dividerColor = panelBorder,
                         leading = {
                             OverlayIconAction(
-                                imageVector = Icons.Outlined.DocumentScanner,
-                                tint = if (dark) Color(0x66F2F5F8) else Color(0x668D8983),
+                                imageVector = LiquidGlassIcons.Ocr,
+                                tint = mutedIconTint,
                                 enabled = false,
                                 onClick = {},
                                 contentDescription = stringResource(R.string.bigbang_action_ocr),
@@ -415,16 +438,16 @@ private fun BigBangOverlayContent(
                         },
                         center = {
                             OverlayIconAction(
-                                iconRes = R.drawable.boom_cancel,
-                                tint = if (dark) Color(0xFFF2F5F8) else Color(0xFF8D8983),
+                                imageVector = LiquidGlassIcons.Close,
+                                tint = iconTint,
                                 onClick = requestDismiss,
                                 contentDescription = stringResource(R.string.search_overlay_close),
                             )
                         },
                         trailing = {
                             OverlayIconAction(
-                                imageVector = Icons.Outlined.Language,
-                                tint = if (dark) Color(0x66F2F5F8) else Color(0x668D8983),
+                                imageVector = LiquidGlassIcons.Language,
+                                tint = mutedIconTint,
                                 enabled = false,
                                 onClick = {},
                                 contentDescription = stringResource(R.string.bigbang_action_language),

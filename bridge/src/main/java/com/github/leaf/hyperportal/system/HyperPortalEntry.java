@@ -56,6 +56,9 @@ public final class HyperPortalEntry extends XposedModule {
     public void onPackageLoaded(PackageLoadedParam param) {
         super.onPackageLoaded(param);
         if ("com.android.systemui".equals(param.getPackageName())) {
+            if (!param.isFirstPackage() || !"com.android.systemui".equals(param.getProcessName())) {
+                return;
+            }
             log(Log.INFO, TAG, "onPackageLoaded: injecting Aurora Glow & Bottom Shelf into SystemUI");
             PortalSystemUiModule.initSystemUi(this, param);
         } else if ("com.xiaomi.aicr".equals(param.getPackageName())) {
@@ -68,6 +71,7 @@ public final class HyperPortalEntry extends XposedModule {
     public boolean onHotReloading(@NonNull HotReloadingParam param) {
         trace("onHotReloading extras=" + param.getExtras());
         log(Log.INFO, TAG, "onHotReloading: hot reload requested for HyperPortal");
+        PortalSystemUiModule.teardownForHotReload();
         return true;
     }
 

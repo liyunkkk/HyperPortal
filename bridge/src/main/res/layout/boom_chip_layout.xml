@@ -15,6 +15,7 @@
         android:ellipsize="end"
         android:maxWidth="260dp"
         android:background="@drawable/boom_chips_bg"
+        android:fontFamily="sans-serif-medium"
         android:textColor="@color/boom_chip_text_color"
         android:textSize="@dimen/chip_text_size" />
 </LinearLayout>
