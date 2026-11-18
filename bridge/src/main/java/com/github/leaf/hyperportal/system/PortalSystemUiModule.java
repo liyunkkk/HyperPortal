@@ -742,6 +742,11 @@ public final class PortalSystemUiModule {
         }
     }
 
+    private static final String ACTION_TEARDOWN_OVERLAY =
+            "com.github.leaf.hyperportal.ACTION_TEARDOWN_OVERLAY";
+    private static final String EXTRA_INSTANCE_ID = "instance_id";
+    private static final String INSTANCE_ID = java.util.UUID.randomUUID().toString();
+
     public static void teardownForHotReload() {
         SystemUiOverlay overlay = sOverlay;
         sOverlay = null;
@@ -764,6 +769,17 @@ public final class PortalSystemUiModule {
                 return;
             }
             try {
+                // Evict any legacy or previous-classloader SystemUiOverlay instances
+                // that are still alive in this SystemUI process (e.g. from pre-ai6
+                // multi-package onPackageLoaded calls or hot reloads).
+                try {
+                    Intent evict = new Intent(ACTION_TEARDOWN_OVERLAY);
+                    evict.setPackage("com.android.systemui");
+                    evict.putExtra(EXTRA_INSTANCE_ID, INSTANCE_ID);
+                    context.sendBroadcast(evict);
+                } catch (Throwable ignored) {
+                }
+
                 long started = SystemClock.uptimeMillis();
                 SystemUiOverlay overlay = new SystemUiOverlay(context);
                 // Register first: from here on every drag is handled, even
@@ -2106,6 +2122,13 @@ public final class PortalSystemUiModule {
                 mDockBar.animate().cancel();
                 mDockBar.stopAutoScroll();
             }
+            if (mTransferDockController != null) {
+                try {
+                    mTransferDockController.teardown();
+                } catch (Throwable ignored) {
+                }
+                mTransferDockController = null;
+            }
             hideOverlay();
             if (mDragReceiver != null) {
                 try {
@@ -2134,6 +2157,7 @@ public final class PortalSystemUiModule {
             filter.addAction(TransferDockDragGuard.ACTION_STATE);
             filter.addAction("com.github.leaf.hyperportal.OPEN_TRANSFER_DOCK");
             filter.addAction("com.github.leaf.hyperportal.ACTION_SAVE_TRANSFER_DOCK");
+            filter.addAction(ACTION_TEARDOWN_OVERLAY);
             filter.addAction(Intent.ACTION_USER_UNLOCKED);
             filter.addAction(Intent.ACTION_BOOT_COMPLETED);
             if (Build.VERSION.SDK_INT >= 33) {
@@ -2300,6 +2324,23 @@ public final class PortalSystemUiModule {
         private void handleIntent(Intent intent, int senderUid) {
             if (intent == null) return;
             String action = intent.getAction();
+            if (ACTION_TEARDOWN_OVERLAY.equals(action)) {
+                if (senderUid > 0
+                        && senderUid != android.os.Process.myUid()
+                        && !isTrustedStatusCaller(mContext, senderUid)) {
+                    return;
+                }
+                String activeId = intent.getStringExtra(EXTRA_INSTANCE_ID);
+                if (!INSTANCE_ID.equals(activeId)) {
+                    Log.i(TAG, "tearing down superseded SystemUiOverlay instance ("
+                            + INSTANCE_ID + " -> " + activeId + ")");
+                    if (sOverlay == this) {
+                        sOverlay = null;
+                    }
+                    teardown();
+                }
+                return;
+            }
             if (ACTION_REQUEST_GRANT.equals(action)) {
                 String pkg = intent.getStringExtra("package");
                 if (TextUtils.isEmpty(pkg)) {

@@ -619,4 +619,52 @@ public class TransferDockController {
             hideFloatBar();
         }
     }
+
+    /**
+     * Tear down all attached windows and listeners immediately (e.g., on hot reload).
+     */
+    public void teardown() {
+        mMainHandler.post(() -> {
+            notifyTransferDockDragState(false);
+            if (mPanelSlideAnim != null) {
+                mPanelSlideAnim.cancel();
+                mPanelSlideAnim = null;
+            }
+            if (mCapsuleAttached && mCapsuleView != null) {
+                try {
+                    mWindowManager.removeView(mCapsuleView);
+                } catch (Throwable ignored) {
+                }
+                mCapsuleAttached = false;
+            }
+            if (mFloatBarAttached && mFloatBarView != null) {
+                try {
+                    mWindowManager.removeView(mFloatBarView);
+                } catch (Throwable ignored) {
+                }
+                mFloatBarAttached = false;
+            }
+            if (mPanelAttached && mPanelView != null) {
+                try {
+                    mWindowManager.removeView(mPanelView);
+                } catch (Throwable ignored) {
+                }
+                mPanelAttached = false;
+            }
+            if (mScrimAttached && mScrimView != null) {
+                try {
+                    mWindowManager.removeView(mScrimView);
+                } catch (Throwable ignored) {
+                }
+                mScrimAttached = false;
+            }
+            if (Build.VERSION.SDK_INT >= 31 && mBlurListenerRegistered && mBlurEnabledListener != null) {
+                try {
+                    mWindowManager.removeCrossWindowBlurEnabledListener(mBlurEnabledListener);
+                } catch (Throwable ignored) {
+                }
+                mBlurListenerRegistered = false;
+            }
+        });
+    }
 }
