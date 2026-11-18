@@ -31,6 +31,7 @@ public final class HyperPortalEntry extends XposedModule {
      * actually happened is exactly what has to be observable while debugging.
      */
     private static final String RELOAD_TAG = "HyperPortalHotReload";
+    private volatile String mProcessName;
 
     private static void trace(String message) {
         Log.println(Log.INFO, RELOAD_TAG, message);
@@ -39,6 +40,7 @@ public final class HyperPortalEntry extends XposedModule {
     @Override
     public void onModuleLoaded(ModuleLoadedParam param) {
         super.onModuleLoaded(param);
+        mProcessName = param.getProcessName();
         trace("onModuleLoaded process=" + param.getProcessName()
                 + " isSystemServer=" + param.isSystemServer());
         log(Log.INFO, TAG, "onModuleLoaded process=" + param.getProcessName()
@@ -55,8 +57,9 @@ public final class HyperPortalEntry extends XposedModule {
     @Override
     public void onPackageLoaded(PackageLoadedParam param) {
         super.onPackageLoaded(param);
+        String processName = mProcessName != null ? mProcessName : android.app.Application.getProcessName();
         if ("com.android.systemui".equals(param.getPackageName())) {
-            if (!param.isFirstPackage() || !"com.android.systemui".equals(param.getProcessName())) {
+            if (!param.isFirstPackage() || !"com.android.systemui".equals(processName)) {
                 return;
             }
             log(Log.INFO, TAG, "onPackageLoaded: injecting Aurora Glow & Bottom Shelf into SystemUI");
