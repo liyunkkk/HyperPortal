@@ -65,6 +65,8 @@ class TextSegmentationActivity : ComponentActivity() {
     private var launchTouchY by mutableIntStateOf(-1)
     private var currentText = ""
     private var currentSegment: IntArray? = null
+    private var liquidText by mutableStateOf("")
+    private var liquidWords by mutableStateOf<List<String>>(emptyList())
     private var animatedDismissRequester: (() -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -84,17 +86,12 @@ class TextSegmentationActivity : ComponentActivity() {
         }
 
         setContent {
-            BigBangOverlayContent(
-                contentView = legacyContentView,
-                touchX = launchTouchX,
-                touchY = launchTouchY,
-                onDismissRequesterChanged = { animatedDismissRequester = it },
-                onDismissRequest = { shouldDismissPage() },
-                onDismissFinished = { finish() },
-                onEditMode = { showUnsupportedAction() },
-                onSelectAll = { selectAll() },
-                onShareAll = { shareAll() },
-                onMore = { showUnsupportedAction() },
+            LiquidGlassBigBangPanel(
+                words = liquidWords,
+                fullText = liquidText,
+                onSearch = { q -> openSearch(q, BoomActionHandler.SEARCH_WEB) },
+                onEdit = { showUnsupportedAction() },
+                onClose = { finish() },
             )
         }
 
@@ -211,6 +208,16 @@ class TextSegmentationActivity : ComponentActivity() {
         }
         currentText = text
         currentSegment = result
+        liquidText = text
+        val parsed = ArrayList<String>(result.size / 2)
+        var i = 0
+        while (i + 1 < result.size) {
+            val s = result[i].coerceIn(0, text.length)
+            val e = (result[i + 1] + 1).coerceIn(s, text.length)
+            if (e > s) parsed.add(text.substring(s, e))
+            i += 2
+        }
+        liquidWords = parsed.ifEmpty { listOf(text) }
         if (fromSavedState) {
             // The chip core restores the serialised selection during its first layout pass.
         }
