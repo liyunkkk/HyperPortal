@@ -72,10 +72,6 @@ class TextSegmentationActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = AndroidColor.TRANSPARENT
         window.navigationBarColor = AndroidColor.TRANSPARENT
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-            window.setBackgroundBlurRadius(60)
-        }
         updateLaunchPosition()
 
         legacyContentView = layoutInflater.inflate(R.layout.boom_activity_layout, null, false)
