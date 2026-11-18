@@ -81,12 +81,17 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           mkdir -p .sign
-          echo "$KEYSTORE_B64" | base64 -d > .sign/my-release-key.jks
-          python3 -c "
+          if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > .sign/my-release-key.jks
+            python3 -c "
           import os
           with open('.sign/qianming.txt', 'w', encoding='utf-8') as f:
               f.write(f'ALIAS\n{os.environ[\"KEY_ALIAS\"]}\nKEY_PASSWORD\n{os.environ[\"KEY_PASSWORD\"]}\nKEYSTORE_PASSWORD\n{os.environ[\"KEYSTORE_PASSWORD\"]}\n')
           "
+          else
+            keytool -genkeypair -v -keystore .sign/my-release-key.jks -alias hyperportal -keyalg RSA -keysize 2048 -validity 10000 -storepass android123 -keypass android123 -dname "CN=HyperPortal, OU=Dev, O=HyperPortal, L=Beijing, S=Beijing, C=CN"
+            printf "ALIAS\nhyperportal\nKEY_PASSWORD\nandroid123\nKEYSTORE_PASSWORD\nandroid123\n" > .sign/qianming.txt
+          fi
 
       - name: Grant Execute Permissions
         run: chmod +x gradlew
