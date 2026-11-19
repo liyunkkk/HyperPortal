@@ -662,7 +662,7 @@ internal class BoomChipPage(activity: Activity, contentView: View, enableLegacyM
         }
 
         fun setSelected(selected: Boolean) {
-            word.setShadowLayer(if (selected) 0.75f else 0f, 0f, 1.0f, 0x33265D9A)
+            word.setShadowLayer(0f, 0f, 0f, 0x00000000)
             word.isSelected = selected
         }
     }

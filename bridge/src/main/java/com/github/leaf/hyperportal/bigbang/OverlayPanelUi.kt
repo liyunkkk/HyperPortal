@@ -43,7 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
@@ -171,18 +170,6 @@ internal fun FloatingPanel(
                         .fillMaxSize()
                         .then(fillModifier)
                         .drawBehind {
-                            // A restrained pearly wash gives the glass a light-catching surface
-                            // without obscuring the live backdrop blur beneath it.
-                            drawRect(
-                                brush = Brush.radialGradient(
-                                    colors = listOf(
-                                        Color.White.copy(alpha = 0.18f),
-                                        Color.Transparent,
-                                    ),
-                                    center = Offset(size.width * 0.12f, 0f),
-                                    radius = size.width * 0.92f,
-                                ),
-                            )
                             if (innerTopHighlightColor != Color.Transparent) {
                                 val stroke = 1.5.dp.toPx()
                                 drawLine(
@@ -515,32 +502,15 @@ internal fun OverlayIconAction(
     onClick: () -> Unit,
     contentDescription: String,
 ) {
-    val pillBorder = Color.White.copy(alpha = 0.82f)
+    val pillBg = Color.White.copy(alpha = 0.68f)
+    val pillBorder = Color.White.copy(alpha = 0.95f)
     Box(
         modifier = Modifier
             .requiredWidth(36.dp)
             .requiredHeight(36.dp)
             .graphicsLayer { alpha = if (enabled) 1f else 0.72f }
-            .shadow(3.dp, CircleShape, clip = false)
             .clip(CircleShape)
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.92f),
-                        Color.White.copy(alpha = 0.56f),
-                        Color(0xFFE5F1FF).copy(alpha = 0.70f),
-                    ),
-                ),
-            )
-            .drawBehind {
-                val glossY = 1.dp.toPx()
-                drawLine(
-                    color = Color.White.copy(alpha = 0.82f),
-                    start = Offset(size.width * 0.28f, glossY),
-                    end = Offset(size.width * 0.72f, glossY),
-                    strokeWidth = 1.dp.toPx(),
-                )
-            }
+            .background(pillBg)
             .border(1.dp, pillBorder, CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },

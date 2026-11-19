@@ -276,28 +276,31 @@ private fun BigBangOverlayContent(
 ) {
     // The segmentation sheet intentionally stays light to match the approved Liquid Glass preview.
     val panelMetrics = rememberOverlayPanelMetrics()
-    val panelBackground = Color(0xC7FFFFFF)
-    val panelFallbackBackground = Color(0xF5FAFCFF)
+    val panelBackground = Color(0xD9FFFFFF)
+    val panelFallbackBackground = Color(0xF5F8FCFF)
     val panelBrush = remember {
         Brush.verticalGradient(
             listOf(
-                Color(0xB8FFFFFF),
-                Color(0xA8F4F9FF),
-                Color(0xB8EFF6FF),
+                Color(0xE0FFFFFF),
+                Color(0xD8F1F7FF),
+                Color(0xD2E6F0FC),
+                Color(0xDCEFF6FF),
             ),
         )
     }
+    // Strong enough to retain legibility when SurfaceFlinger backdrop blur is unavailable.
     val panelFallbackBrush = remember {
-        Brush.verticalGradient(listOf(Color(0xF5FAFCFF), Color(0xF0F4F8FC)))
+        Brush.verticalGradient(listOf(Color(0xF5F8FBFF), Color(0xF0EDF3F9)))
     }
-    val panelBorder = Color.White.copy(alpha = 0.94f)
-    val innerTopHighlight = Color.White.copy(alpha = 0.82f)
-    val innerBottomHighlight = Color.White.copy(alpha = 0.50f)
-    val topBarColor = Color.White.copy(alpha = 0.40f)
-    val bottomBarColor = Color.White.copy(alpha = 0.36f)
-    val dividerColor = Color(0xFF8CA5C0).copy(alpha = 0.18f)
-    val scrimColor = Color(0xFFF5F9FF).copy(alpha = 0.22f)
-    val shadowColor = Color(0xFF658BB5).copy(alpha = 0.18f)
+    val panelBorder = Color.White.copy(alpha = 0.98f)
+    val innerTopHighlight = Color.White.copy(alpha = 0.90f)
+    val innerBottomHighlight = Color(0xFFB9D3F1).copy(alpha = 0.46f)
+    val topBarColor = Color.White.copy(alpha = 0.32f)
+    val bottomBarColor = Color.White.copy(alpha = 0.30f)
+    val dividerColor = Color(0xFF829BB8).copy(alpha = 0.16f)
+    // A cool, very light scrim keeps the page behind the sheet readable instead of bleaching it.
+    val scrimColor = Color(0xFF536B88).copy(alpha = 0.10f)
+    val shadowColor = Color(0xFF527BA8).copy(alpha = 0.16f)
     val iconTint = Color(0xFF435A78)
     val mutedIconTint = Color(0xFF435A78).copy(alpha = 0.36f)
     val titleColor = Color(0xFF263951)
@@ -369,7 +372,7 @@ private fun BigBangOverlayContent(
                 },
             shape = panelShape,
             cornerRadius = panelMetrics.cornerRadius,
-            backdropBlurRadius = 38.dp * enterProgress,
+            backdropBlurRadius = 64.dp * enterProgress,
             backgroundColor = panelBackground,
             fallbackBackgroundColor = panelFallbackBackground,
             backgroundBrush = panelBrush,

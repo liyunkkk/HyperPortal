@@ -4,18 +4,16 @@
         <shape android:shape="oval">
             <gradient
                 android:angle="270"
-                android:startColor="#FF73B4FF"
-                android:endColor="#FF347BE4" />
-            <stroke android:width="1dp" android:color="#D9FFFFFF" />
+                android:endColor="#FF006AE6"
+                android:startColor="#FF1A84EB" />
         </shape>
     </item>
     <item>
         <shape android:shape="oval">
             <gradient
                 android:angle="270"
-                android:startColor="#91F4F9FF"
-                android:endColor="#73B4FFFF" />
-            <stroke android:width="1dp" android:color="#A6FFFFFF" />
+                android:endColor="#F00A7AFF"
+                android:startColor="#F02394FF" />
         </shape>
     </item>
 </selector>
