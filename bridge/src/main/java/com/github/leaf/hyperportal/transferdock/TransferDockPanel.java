@@ -15,6 +15,12 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorFilter;
+import android.graphics.LinearGradient;
+import android.graphics.Paint;
+import android.graphics.PixelFormat;
+import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -78,20 +84,24 @@ public class TransferDockPanel extends FrameLayout {
     private static final PathInterpolator sEaseInterpolator =
             new PathInterpolator(0.3f, 0.0f, 0.1f, 1.0f);
 
-    private static final int PANEL_WIDTH_DP = 146;
+    private static final int PANEL_WIDTH_DP = 132;
     private static final int PANEL_HEIGHT_DP = 578;
     private static final int HEADER_HEIGHT_DP = 40;
-    private static final int FOOTER_HEIGHT_DP = 72;
-    private static final int CARD_WIDTH_DP = 122;
+    private static final int FOOTER_HEIGHT_DP = 64;
     private static final int CARD_HEIGHT_DP = 84;
-    private static final int CARD_RADIUS_DP = 17;
-    private static final int PANEL_RADIUS_DP = 20;
+    private static final int CARD_RADIUS_DP = 20;
+    private static final int PANEL_RADIUS_DP = 32;
+    private static final int BLUR_RADIUS_DP = 44;
 
     private final float mDensity;
-    private final int mPanelHeightPx;
+    private int mPanelWidthPx;
+    private int mPanelHeightPx;
+    private int mPanelRadiusPx;
+    private boolean mAlignRight = true;
 
     private LinearLayout mDrawerLayout;
     private RelativeLayout mHeaderBar;
+    private View mHeaderDivider;
     private TextView mTitleView;
     private ImageView mBackBtn;
     private FrameLayout mContentContainer;
@@ -129,7 +139,10 @@ public class TransferDockPanel extends FrameLayout {
         super(context, attrs);
         mDensity = context.getResources().getDisplayMetrics().density;
         DisplayMetrics dm = getResources().getDisplayMetrics();
-        mPanelHeightPx = Math.min(dp(PANEL_HEIGHT_DP), Math.max(dp(360), dm.heightPixels - dp(96)));
+        mPanelWidthPx = dp(PANEL_WIDTH_DP);
+        int defaultHeight = (int) (dm.heightPixels * 0.58f);
+        mPanelHeightPx = Math.min(Math.max(defaultHeight, dp(420)), Math.max(dp(360), dm.heightPixels - dp(120)));
+        mPanelRadiusPx = dp(PANEL_RADIUS_DP);
         mTheme = TransferDockTheme.resolve(context, false);
         mLastNotifiedNight = mTheme.night;
         init();
@@ -147,12 +160,39 @@ public class TransferDockPanel extends FrameLayout {
         this.mThemeListener = listener;
     }
 
+    public void setPanelGeometry(int widthPx, int heightPx, int cornerRadiusPx, boolean alignRight) {
+        boolean changed = false;
+        if (widthPx > 0 && widthPx != mPanelWidthPx) {
+            mPanelWidthPx = widthPx;
+            changed = true;
+        }
+        if (heightPx > 0 && heightPx != mPanelHeightPx) {
+            mPanelHeightPx = heightPx;
+            changed = true;
+        }
+        int resolvedRadius = cornerRadiusPx > 0 ? cornerRadiusPx : dp(PANEL_RADIUS_DP);
+        int maxRadius = Math.max(dp(18), mPanelWidthPx / 3);
+        resolvedRadius = Math.min(resolvedRadius, maxRadius);
+        if (resolvedRadius != mPanelRadiusPx) {
+            mPanelRadiusPx = resolvedRadius;
+            changed = true;
+        }
+        mAlignRight = alignRight;
+        if (changed && mDrawerLayout != null) {
+            applyTheme();
+        }
+    }
+
     public int getPanelHeightPx() {
         return mPanelHeightPx;
     }
 
     public int getPanelWidthPx() {
-        return dp(PANEL_WIDTH_DP);
+        return mPanelWidthPx;
+    }
+
+    public int getPanelRadiusPx() {
+        return mPanelRadiusPx;
     }
 
     private int dp(float value) {
@@ -172,11 +212,11 @@ public class TransferDockPanel extends FrameLayout {
         addView(mDrawerLayout, new LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
-        // 2. Header: back / centered title / overflow, matching layout_transfer_panel.
+        // 2. Header: back / centered title, with glass divider matching HyperDock.
         mHeaderBar = new RelativeLayout(getContext());
         LinearLayout.LayoutParams headerLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(HEADER_HEIGHT_DP));
-        headerLp.topMargin = dp(8);
+        headerLp.topMargin = dp(10);
         mDrawerLayout.addView(mHeaderBar, headerLp);
 
         mBackBtn = new ImageView(getContext());
@@ -184,10 +224,10 @@ public class TransferDockPanel extends FrameLayout {
         mBackBtn.setPadding(dp(8), dp(8), dp(8), dp(8));
         mBackBtn.setContentDescription("关闭");
         mBackBtn.setOnClickListener(v -> dismissWithAnim());
-        RelativeLayout.LayoutParams backLp = new RelativeLayout.LayoutParams(dp(40), dp(40));
+        RelativeLayout.LayoutParams backLp = new RelativeLayout.LayoutParams(dp(36), dp(36));
         backLp.addRule(RelativeLayout.ALIGN_PARENT_START);
         backLp.addRule(RelativeLayout.CENTER_VERTICAL);
-        backLp.leftMargin = dp(4);
+        backLp.leftMargin = dp(6);
         mHeaderBar.addView(mBackBtn, backLp);
 
         mTitleView = new TextView(getContext());
@@ -202,6 +242,15 @@ public class TransferDockPanel extends FrameLayout {
                 RelativeLayout.LayoutParams.MATCH_PARENT);
         titleLp.addRule(RelativeLayout.CENTER_IN_PARENT);
         mHeaderBar.addView(mTitleView, titleLp);
+
+        mHeaderDivider = new View(getContext());
+        LinearLayout.LayoutParams headerDividerLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, Math.max(1, dp(1.5f)));
+        headerDividerLp.leftMargin = dp(14);
+        headerDividerLp.rightMargin = dp(14);
+        headerDividerLp.topMargin = dp(2);
+        headerDividerLp.bottomMargin = dp(4);
+        mDrawerLayout.addView(mHeaderDivider, headerDividerLp);
 
         // 3. Scrollable list.
         mContentContainer = new FrameLayout(getContext());
@@ -243,7 +292,7 @@ public class TransferDockPanel extends FrameLayout {
         mScrollView.setVerticalScrollBarEnabled(false);
         mScrollView.setOverScrollMode(OVER_SCROLL_NEVER);
         mScrollView.setClipToPadding(false);
-        mScrollView.setPadding(dp(8), dp(6), dp(8), dp(6));
+        mScrollView.setPadding(dp(10), dp(6), dp(10), dp(6));
 
         mCardContainer = new LinearLayout(getContext());
         mCardContainer.setOrientation(LinearLayout.VERTICAL);
@@ -254,7 +303,7 @@ public class TransferDockPanel extends FrameLayout {
         mContentContainer.addView(mScrollView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
-        // 4. Bottom clear button: 72dp footer, 114dp x 40dp pill.
+        // 4. Bottom clear pill adapted to the panel width.
         mFooter = new FrameLayout(getContext());
         LinearLayout.LayoutParams footerLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(FOOTER_HEIGHT_DP));
@@ -262,19 +311,24 @@ public class TransferDockPanel extends FrameLayout {
 
         mClearBtn = new TextView(getContext());
         mClearBtn.setText("清空");
-        mClearBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        mClearBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f);
         mClearBtn.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         mClearBtn.setGravity(Gravity.CENTER);
         mClearBtn.setIncludeFontPadding(false);
         mClearBtn.setOnClickListener(v -> clearTransferDock());
-        FrameLayout.LayoutParams clearLp = new FrameLayout.LayoutParams(dp(114), dp(40));
+        FrameLayout.LayoutParams clearLp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, dp(38));
         clearLp.gravity = Gravity.CENTER;
+        clearLp.leftMargin = dp(12);
+        clearLp.rightMargin = dp(12);
         mFooter.addView(mClearBtn, clearLp);
 
         View footerDivider = new View(getContext());
         FrameLayout.LayoutParams dividerLp = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, Math.max(1, dp(0.5f)));
+                FrameLayout.LayoutParams.MATCH_PARENT, Math.max(1, dp(1.5f)));
         dividerLp.gravity = Gravity.TOP;
+        dividerLp.leftMargin = dp(14);
+        dividerLp.rightMargin = dp(14);
         mFooter.addView(footerDivider, dividerLp);
         mFooter.setTag(footerDivider);
 
@@ -324,24 +378,32 @@ public class TransferDockPanel extends FrameLayout {
         reloadItems();
     }
 
+    private Drawable buildGlassSurfaceDrawable() {
+        GradientDrawable tint = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{mTheme.panelTintTop, mTheme.panelTintMid, mTheme.panelTintBottom});
+        tint.setCornerRadius(mPanelRadiusPx);
+        return tint;
+    }
+
     private Drawable buildPanelBackground() {
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(mTheme.panelFill);
-        bg.setCornerRadius(dp(PANEL_RADIUS_DP));
-        return bg;
+        Drawable surface = buildGlassSurfaceDrawable();
+        Drawable rim = new LiquidGlassRimDrawable(mDensity, mPanelRadiusPx, mTheme);
+        return new LayerDrawable(new Drawable[]{surface, rim});
     }
 
     private Drawable buildCardBackground() {
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(mTheme.cardBackground);
         bg.setCornerRadius(dp(CARD_RADIUS_DP));
+        bg.setStroke(Math.max(1, dp(0.85f)), mTheme.cardStroke);
         return bg;
     }
 
     private Drawable buildIconBackground() {
         GradientDrawable pressed = new GradientDrawable();
         pressed.setColor(mTheme.pressedOverlay);
-        pressed.setCornerRadius(dp(20));
+        pressed.setCornerRadius(dp(18));
 
         StateListDrawable states = new StateListDrawable();
         states.addState(new int[]{android.R.attr.state_pressed}, pressed);
@@ -352,7 +414,8 @@ public class TransferDockPanel extends FrameLayout {
     private Drawable buildFooterBackground() {
         GradientDrawable shape = new GradientDrawable();
         shape.setColor(mTheme.footerBackground);
-        shape.setCornerRadius(dp(20));
+        shape.setCornerRadius(dp(19));
+        shape.setStroke(Math.max(1, dp(0.85f)), mTheme.footerStroke);
         return new RippleDrawable(ColorStateList.valueOf(mTheme.pressedOverlay), shape, null);
     }
 
@@ -369,18 +432,22 @@ public class TransferDockPanel extends FrameLayout {
         mBackBtn.setImageDrawable(TransferDockRes.getBackIcon(
                 getContext(), mDensity, mTheme.primaryText));
         mBackBtn.setBackground(buildIconBackground());
+        if (mHeaderDivider != null) {
+            mHeaderDivider.setBackground(new GlassDividerDrawable(mTheme.divider));
+        }
 
         mEmptyIcon.setColorFilter(mTheme.emptyIcon);
-        mEmptyTitle.setTextColor(mTheme.secondaryText);
+        mEmptyTitle.setTextColor(mTheme.primaryText);
+        mEmptyTitle.setAlpha(0.76f);
         mEmptyHint.setTextColor(mTheme.secondaryText);
-        mEmptyHint.setAlpha(0.72f);
+        mEmptyHint.setAlpha(0.76f);
 
         mClearBtn.setTextColor(mTheme.footerText);
         mClearBtn.setBackground(buildFooterBackground());
 
         Object tag = mFooter.getTag();
         if (tag instanceof View) {
-            ((View) tag).setBackgroundColor(mTheme.divider);
+            ((View) tag).setBackground(new GlassDividerDrawable(mTheme.divider));
         }
 
         if (mThemeListener != null && mLastNotifiedNight != mTheme.night) {
@@ -473,10 +540,10 @@ public class TransferDockPanel extends FrameLayout {
             return false;
         }
         try {
-            mBlurSetRadius.invoke(mLocalBlurDrawable, dp(32));
-            mBlurSetCorner.invoke(mLocalBlurDrawable, (float) dp(PANEL_RADIUS_DP));
-            // The tint is a separate layer below the content so the blur
-            // drawable can remain transparent and the panel keeps its color.
+            mBlurSetRadius.invoke(mLocalBlurDrawable, dp(BLUR_RADIUS_DP));
+            mBlurSetCorner.invoke(mLocalBlurDrawable, (float) mPanelRadiusPx);
+            // The tint and specular rim are separate layers above the blur
+            // drawable so the real-time backdrop stays crisp and luminous.
             mBlurSetColor.invoke(mLocalBlurDrawable, Color.TRANSPARENT);
             mLocalBlurDrawable.invalidateSelf();
             return true;
@@ -487,10 +554,9 @@ public class TransferDockPanel extends FrameLayout {
     }
 
     private Drawable buildLocalBlurBackground() {
-        GradientDrawable tint = new GradientDrawable();
-        tint.setColor(mTheme.panelFill);
-        tint.setCornerRadius(dp(PANEL_RADIUS_DP));
-        return new LayerDrawable(new Drawable[]{mLocalBlurDrawable, tint});
+        Drawable surface = buildGlassSurfaceDrawable();
+        Drawable rim = new LiquidGlassRimDrawable(mDensity, mPanelRadiusPx, mTheme);
+        return new LayerDrawable(new Drawable[]{mLocalBlurDrawable, surface, rim});
     }
 
     public void restoreFromDrag() {
@@ -521,7 +587,7 @@ public class TransferDockPanel extends FrameLayout {
     private View createCardView(TransferDockItem item) {
         FrameLayout card = new FrameLayout(getContext());
         LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
-                dp(CARD_WIDTH_DP), dp(CARD_HEIGHT_DP));
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(CARD_HEIGHT_DP));
         cardLp.gravity = Gravity.CENTER_HORIZONTAL;
         cardLp.bottomMargin = dp(8);
         card.setLayoutParams(cardLp);
@@ -600,12 +666,16 @@ public class TransferDockPanel extends FrameLayout {
         if (android.os.SystemClock.uptimeMillis() - mDragStartedAt < 260) {
             return;
         }
-        // At the aside position only the left 36dp is visible.  Expand only
-        // when the finger is safely inside the 24dp inner band, otherwise the
-        // expanded window would end right under the finger and immediately
-        // collapse again.
-        if (panelX > dp(24)) {
-            return;
+        // At the aside position only the inner 36dp strip is visible. Expand
+        // only when the finger is safely inside the 24dp inner band.
+        if (mAlignRight) {
+            if (panelX > dp(24)) {
+                return;
+            }
+        } else {
+            if (panelX < Math.max(0, getWidth() - dp(24))) {
+                return;
+            }
         }
         mDragPanelAside = false;
         if (mController != null) {
@@ -835,7 +905,7 @@ public class TransferDockPanel extends FrameLayout {
         mDrawerLayout.animate().cancel();
         mDrawerLayout.setAlpha(1.0f);
         mDrawerLayout.setTranslationX(0f);
-        mDrawerLayout.setPivotX(getPanelWidthPx());
+        mDrawerLayout.setPivotX(mAlignRight ? getPanelWidthPx() : 0f);
         mDrawerLayout.setPivotY(mPanelHeightPx / 2f);
         mDrawerLayout.setScaleX(0.94f);
         mDrawerLayout.setScaleY(0.97f);
@@ -905,5 +975,153 @@ public class TransferDockPanel extends FrameLayout {
         mBlurSetCorner = null;
         mBlurSetColor = null;
         super.onDetachedFromWindow();
+    }
+
+    /**
+     * Draws a crisp specular glass rim (luminous top/bottom edge + subtle
+     * inner highlight) matching HyperDock's liquid-glass sidebar panel.
+     */
+    private static final class LiquidGlassRimDrawable extends Drawable {
+
+        private final float mCornerRadius;
+        private final float mOuterStrokeWidth;
+        private final float mInnerStrokeWidth;
+        private final int mRimTop;
+        private final int mRimMid;
+        private final int mRimBottom;
+        private final int mInnerGlow;
+        private final Paint mOuterPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint mInnerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF mOuterRect = new RectF();
+        private final RectF mInnerRect = new RectF();
+        private int mLastHeight = -1;
+
+        LiquidGlassRimDrawable(float density, float cornerRadius, TransferDockTheme theme) {
+            mCornerRadius = cornerRadius;
+            mOuterStrokeWidth = Math.max(1.2f, 1.25f * density);
+            mInnerStrokeWidth = Math.max(1.0f, 1.0f * density);
+            mRimTop = theme.panelRimTop;
+            mRimMid = theme.panelRimMid;
+            mRimBottom = theme.panelRimBottom;
+            mInnerGlow = theme.panelInnerGlow;
+
+            mOuterPaint.setStyle(Paint.Style.STROKE);
+            mOuterPaint.setStrokeWidth(mOuterStrokeWidth);
+
+            mInnerPaint.setStyle(Paint.Style.STROKE);
+            mInnerPaint.setStrokeWidth(mInnerStrokeWidth);
+        }
+
+        @Override
+        public void draw(@NonNull Canvas canvas) {
+            android.graphics.Rect b = getBounds();
+            if (b.width() <= 0 || b.height() <= 0) {
+                return;
+            }
+            if (mLastHeight != b.height()) {
+                mLastHeight = b.height();
+                mOuterPaint.setShader(new LinearGradient(
+                        b.left, b.top, b.left, b.bottom,
+                        new int[]{mRimTop, mRimMid, mRimMid, mRimBottom},
+                        new float[]{0f, 0.28f, 0.72f, 1f},
+                        Shader.TileMode.CLAMP));
+                mInnerPaint.setShader(new LinearGradient(
+                        b.left, b.top, b.left, b.top + Math.max(1f, b.height() * 0.35f),
+                        mInnerGlow, Color.TRANSPARENT,
+                        Shader.TileMode.CLAMP));
+            }
+            float halfOuter = mOuterStrokeWidth * 0.5f;
+            mOuterRect.set(
+                    b.left + halfOuter,
+                    b.top + halfOuter,
+                    b.right - halfOuter,
+                    b.bottom - halfOuter);
+            canvas.drawRoundRect(mOuterRect, mCornerRadius, mCornerRadius, mOuterPaint);
+
+            float inset = mOuterStrokeWidth + mInnerStrokeWidth * 0.5f;
+            float innerRadius = Math.max(0f, mCornerRadius - mOuterStrokeWidth);
+            mInnerRect.set(
+                    b.left + inset,
+                    b.top + inset,
+                    b.right - inset,
+                    b.bottom - inset);
+            canvas.drawRoundRect(mInnerRect, innerRadius, innerRadius, mInnerPaint);
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+            mOuterPaint.setAlpha(alpha);
+            mInnerPaint.setAlpha(alpha);
+            invalidateSelf();
+        }
+
+        @Override
+        public void setColorFilter(@Nullable ColorFilter colorFilter) {
+            mOuterPaint.setColorFilter(colorFilter);
+            mInnerPaint.setColorFilter(colorFilter);
+            invalidateSelf();
+        }
+
+        @Override
+        @SuppressWarnings("deprecation")
+        public int getOpacity() {
+            return PixelFormat.TRANSLUCENT;
+        }
+    }
+
+    /**
+     * Soft glass divider pill with faded ends, matching the section divider
+     * inside HyperDock.
+     */
+    private static final class GlassDividerDrawable extends Drawable {
+
+        private final int mCenterColor;
+        private final Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF mRect = new RectF();
+        private int mLastWidth = -1;
+
+        GlassDividerDrawable(int centerColor) {
+            mCenterColor = centerColor;
+            mPaint.setStyle(Paint.Style.FILL);
+        }
+
+        @Override
+        public void draw(@NonNull Canvas canvas) {
+            android.graphics.Rect b = getBounds();
+            if (b.width() <= 0 || b.height() <= 0) {
+                return;
+            }
+            if (mLastWidth != b.width()) {
+                mLastWidth = b.width();
+                int transparent = Color.argb(0, Color.red(mCenterColor),
+                        Color.green(mCenterColor), Color.blue(mCenterColor));
+                mPaint.setShader(new LinearGradient(
+                        b.left, 0f, b.right, 0f,
+                        new int[]{transparent, mCenterColor, mCenterColor, transparent},
+                        new float[]{0f, 0.16f, 0.84f, 1f},
+                        Shader.TileMode.CLAMP));
+            }
+            mRect.set(b.left, b.top, b.right, b.bottom);
+            float radius = b.height() * 0.5f;
+            canvas.drawRoundRect(mRect, radius, radius, mPaint);
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+            mPaint.setAlpha(alpha);
+            invalidateSelf();
+        }
+
+        @Override
+        public void setColorFilter(@Nullable ColorFilter colorFilter) {
+            mPaint.setColorFilter(colorFilter);
+            invalidateSelf();
+        }
+
+        @Override
+        @SuppressWarnings("deprecation")
+        public int getOpacity() {
+            return PixelFormat.TRANSLUCENT;
+        }
     }
 }

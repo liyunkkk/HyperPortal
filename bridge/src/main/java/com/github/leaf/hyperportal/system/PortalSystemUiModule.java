@@ -2377,7 +2377,19 @@ public final class PortalSystemUiModule {
                 if (mTransferDockController == null) {
                     mTransferDockController = new TransferDockController(mContext);
                 }
-                mTransferDockController.openDrawer();
+                int dockW = intent.getIntExtra("dock_width", 0);
+                int dockH = intent.getIntExtra("dock_height", 0);
+                int dockCorner = intent.getIntExtra("dock_corner_radius", 0);
+                android.graphics.Rect anchorBounds = null;
+                if (dockW > 0 && dockH > 0) {
+                    int dockLeft = intent.getIntExtra("dock_left", -1);
+                    int dockTop = intent.getIntExtra("dock_top", -1);
+                    if (dockLeft >= 0 && dockTop >= 0) {
+                        anchorBounds = new android.graphics.Rect(
+                                dockLeft, dockTop, dockLeft + dockW, dockTop + dockH);
+                    }
+                }
+                mTransferDockController.openDrawer(anchorBounds, dockCorner);
                 return;
             }
             if ("com.github.leaf.hyperportal.ACTION_SAVE_TRANSFER_DOCK".equals(action)) {

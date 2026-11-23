@@ -5,6 +5,7 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -15,6 +16,8 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.animation.PathInterpolator;
 import android.widget.Toast;
+
+import androidx.annotation.Nullable;
 
 import java.util.function.Consumer;
 
@@ -52,6 +55,10 @@ public class TransferDockController {
     private ValueAnimator mPanelSlideAnim;
     private int mPanelRestX;
     private int mPanelDragOutX;
+    private Rect mLastDockBounds;
+    private int mLastDockCornerRadiusPx;
+    private int mLastDockScreenW;
+    private int mLastDockScreenH;
 
     private View mScrimView;
     private WindowManager.LayoutParams mScrimParams;
@@ -330,9 +337,19 @@ public class TransferDockController {
     }
 
     /**
-     * Open the TransferDock drawer panel.
+     * Open the TransferDock drawer panel using the last known HyperDock anchor
+     * bounds (if any) or the default two-column dock geometry.
      */
     public void openDrawer() {
+        openDrawer(null, 0);
+    }
+
+    /**
+     * Open the TransferDock drawer panel, optionally anchored directly onto the
+     * HyperDock sidebar's screen bounds for a seamless in-place transition.
+     */
+    public void openDrawer(@Nullable Rect anchorBounds, int cornerRadiusPx) {
+        final Rect boundsCopy = anchorBounds != null ? new Rect(anchorBounds) : null;
         mMainHandler.post(() -> {
             try {
                 dismissCapsule();
@@ -348,7 +365,6 @@ public class TransferDockController {
                         mScrimView.setBackgroundColor(TransferDockTheme.scrimColor(night));
                     }
                 });
-                mPanelView.refreshTheme();
 
                 if (!mPanelAttached) {
                     ensureScrim();
@@ -369,14 +385,52 @@ public class TransferDockController {
                 mPanelView.setBackdropBlurAvailable(mBlurAvailable);
 
                 DisplayMetrics dm = mContext.getResources().getDisplayMetrics();
-                int panelWidth = mPanelView.getPanelWidthPx();
-                int panelHeight = mPanelView.getPanelHeightPx();
-                int panelTop = Math.max(dp(24), (dm.heightPixels - panelHeight) / 2);
+                if (boundsCopy != null && boundsCopy.width() >= dp(72) && boundsCopy.height() >= dp(160)) {
+                    mLastDockBounds = new Rect(boundsCopy);
+                    mLastDockCornerRadiusPx = cornerRadiusPx;
+                    mLastDockScreenW = dm.widthPixels;
+                    mLastDockScreenH = dm.heightPixels;
+                }
+
+                Rect activeBounds = null;
+                int activeCornerRadius = 0;
+                if (mLastDockBounds != null
+                        && mLastDockScreenW == dm.widthPixels
+                        && mLastDockScreenH == dm.heightPixels) {
+                    activeBounds = mLastDockBounds;
+                    activeCornerRadius = mLastDockCornerRadiusPx;
+                }
+
+                int panelWidth;
+                int panelHeight;
+                int panelTop;
+                int panelRestX;
+                boolean alignRight;
+
+                if (activeBounds != null) {
+                    panelWidth = Math.max(dp(104), Math.min(activeBounds.width(), dm.widthPixels - dp(24)));
+                    panelHeight = Math.max(dp(240), Math.min(activeBounds.height(), dm.heightPixels - dp(48)));
+                    panelTop = Math.max(dp(20), Math.min(activeBounds.top, Math.max(dp(20), dm.heightPixels - panelHeight - dp(8))));
+                    alignRight = (activeBounds.left + activeBounds.right) >= dm.widthPixels;
+                    panelRestX = alignRight
+                            ? Math.max(dp(4), dm.widthPixels - activeBounds.right)
+                            : Math.max(dp(4), activeBounds.left);
+                } else {
+                    panelWidth = dp(132);
+                    int defaultH = (int) (dm.heightPixels * 0.58f);
+                    panelHeight = Math.min(Math.max(defaultH, dp(420)), Math.max(dp(360), dm.heightPixels - dp(120)));
+                    panelTop = Math.max(dp(24), dm.heightPixels - panelHeight - dp(24));
+                    alignRight = true;
+                    panelRestX = dp(12);
+                }
+
+                mPanelView.setPanelGeometry(panelWidth, panelHeight, activeCornerRadius, alignRight);
+                mPanelView.refreshTheme();
 
                 int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                        // The panel slides mostly off the right edge while a
+                        // The panel slides mostly off the edge while a
                         // card is being dragged; allow that negative x offset.
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                         | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
@@ -397,8 +451,8 @@ public class TransferDockController {
                     mPanelParams.height = panelHeight;
                     mPanelParams.flags = flags;
                 }
-                mPanelParams.gravity = Gravity.TOP | Gravity.END;
-                mPanelRestX = dp(8);
+                mPanelParams.gravity = Gravity.TOP | (alignRight ? Gravity.END : Gravity.START);
+                mPanelRestX = panelRestX;
                 // Leave a 36dp grab strip on screen: dragging the payload back
                 // onto it cancels the send and lets the panel return.
                 mPanelDragOutX = mPanelRestX - Math.max(0, panelWidth - dp(36));
@@ -415,7 +469,9 @@ public class TransferDockController {
 
                 mPanelView.reloadItems();
                 mPanelView.showWithAnim();
-                Log.i(TAG, "TransferDock drawer panel opened");
+                Log.i(TAG, "TransferDock drawer panel opened w=" + panelWidth
+                        + " h=" + panelHeight + " top=" + panelTop
+                        + " restX=" + panelRestX + " right=" + alignRight);
             } catch (Throwable t) {
                 Log.w(TAG, "openDrawer failed", t);
             }
