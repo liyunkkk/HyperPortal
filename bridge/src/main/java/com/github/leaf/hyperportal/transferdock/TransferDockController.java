@@ -202,7 +202,8 @@ public class TransferDockController {
     }
 
     /**
-     * Dismiss the capsule window. If items remain, show the ColorOS FloatBar edge handle.
+     * Dismiss the capsule window without spawning the edge FloatBar handle
+     * (TransferDock is now opened from the HyperDock sidebar button).
      */
     public void dismissCapsule() {
         mMainHandler.post(() -> {
@@ -213,65 +214,15 @@ public class TransferDockController {
                 }
                 mCapsuleAttached = false;
             }
-            if (!mPanelAttached && TransferDockManager.getInstance(mContext).getItemCount() > 0) {
-                showFloatBar();
-            }
+            hideFloatBar();
         });
     }
 
     /**
-     * Show ColorOS Smart Sidebar FloatBar (Edge Handle) on the right edge.
+     * Edge FloatBar handle is disabled; ensure any attached handle is removed.
      */
     public void showFloatBar() {
-        mMainHandler.post(() -> {
-            try {
-                if (mPanelAttached || mCapsuleAttached) {
-                    return;
-                }
-                int count = TransferDockManager.getInstance(mContext).getItemCount();
-                if (count <= 0) {
-                    hideFloatBar();
-                    return;
-                }
-
-                if (mFloatBarView == null) {
-                    mFloatBarView = new TransferDockFloatBarView(mContext);
-                    mFloatBarView.setOnHandleClickListener(this::openDrawer);
-                }
-                mFloatBarView.refreshTheme();
-
-                DisplayMetrics dm = mContext.getResources().getDisplayMetrics();
-                int windowType = resolveWindowType();
-
-                if (mFloatBarParams == null) {
-                    mFloatBarParams = new WindowManager.LayoutParams(
-                            dp(20), dp(68),
-                            windowType,
-                            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                                    | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                                    | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                                    | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
-                            PixelFormat.TRANSLUCENT
-                    );
-                    if (Build.VERSION.SDK_INT >= 28) {
-                        mFloatBarParams.layoutInDisplayCutoutMode =
-                                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
-                    }
-                    mFloatBarParams.gravity = Gravity.TOP | Gravity.END;
-                    mFloatBarParams.x = 0;
-                    mFloatBarParams.y = (int) (dm.heightPixels * 0.25f);
-                }
-
-                if (!mFloatBarAttached) {
-                    mWindowManager.addView(mFloatBarView, mFloatBarParams);
-                    mFloatBarAttached = true;
-                }
-                mFloatBarView.setVisibility(View.VISIBLE);
-                Log.i(TAG, "TransferDock FloatBar handle displayed");
-            } catch (Throwable t) {
-                Log.w(TAG, "showFloatBar failed", t);
-            }
-        });
+        hideFloatBar();
     }
 
     /**
@@ -669,11 +620,7 @@ public class TransferDockController {
             mScrimView.setVisibility(View.VISIBLE);
             mScrimView.setAlpha(1f);
         }
-        if (TransferDockManager.getInstance(mContext).getItemCount() > 0) {
-            showFloatBar();
-        } else {
-            hideFloatBar();
-        }
+        hideFloatBar();
     }
 
     /**
