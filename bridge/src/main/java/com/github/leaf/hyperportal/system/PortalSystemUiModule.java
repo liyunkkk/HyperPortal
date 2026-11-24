@@ -5,6 +5,7 @@ import android.app.Application;
 import android.app.SearchManager;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
+import android.content.ClipDescription;
 import android.content.ClipboardManager;
 import android.content.ComponentName;
 import android.content.ContentValues;
@@ -101,6 +102,7 @@ public final class PortalSystemUiModule {
 
     private static final String TAG = "HyperPortalSysUI";
     private static final String ACTION_DRAG_STATE = "com.github.leaf.hyperportal.ACTION_DRAG_STATE";
+    private static final String PORTAL_DRAG_MIME = "application/x-dragshare";
     private static final String ACTION_SHOW = "com.github.leaf.hyperportal.SHOW";
     public static final String ACTION_REQUEST_GRANT = "com.github.leaf.hyperportal.ACTION_REQUEST_GRANT";
     public static final String SYSUI_PROVIDER_AUTHORITY = "com.android.systemui.fileprovider";
@@ -864,6 +866,7 @@ public final class PortalSystemUiModule {
         private volatile List<String> mPinnedOrder = new ArrayList<>();
         private boolean mFirstDragLogged = false;
         private int mCurrentState = 0;
+        private boolean mOwnPortalDrag = false;
 
         public SystemUiOverlay(Context context) {
             // Deliberately trivial. initOverlay() registers the drag-state
@@ -1914,14 +1917,25 @@ public final class PortalSystemUiModule {
 
             // 4. Drag and Drop Listener on Container (ColorOS Dock Interaction & Fly-back)
             mContainer.setOnDragListener((v, event) -> {
+                if (event == null) {
+                    return false;
+                }
                 int action = event.getAction();
                 if (action == DragEvent.ACTION_DRAG_STARTED) {
+                    ClipDescription description = event.getClipDescription();
+                    mOwnPortalDrag = description != null
+                            && description.hasMimeType(PORTAL_DRAG_MIME);
+                    if (!mOwnPortalDrag) {
+                        return false;
+                    }
                     mGallerySavedThisDrag = false;
                     if (TransferDockDragGuard.isDragging() || mTransferDockBroadcastDragging) {
                         handleDragStateChanged(0, 0f);
                         return false;
                     }
                     return isMasterEnabled();
+                } else if (!mOwnPortalDrag) {
+                    return false;
                 } else if (action == DragEvent.ACTION_DRAG_LOCATION) {
                     if (event.getX() == 0f && event.getY() == 0f) {
                         return true;
@@ -1933,7 +1947,8 @@ public final class PortalSystemUiModule {
                     if (mGlowView != null) {
                         mGlowView.setTouchPosition(rawX, rawY);
                     }
-                    if (mShowing && mDockBar != null && mDockBar.getVisibility() == View.VISIBLE) {
+                    if (mShowing && mCurrentState == 2 && mDockBar != null
+                            && mDockBar.getVisibility() == View.VISIBLE) {
                         mDockBar.onDragLocation(rawX, rawY);
                     }
                     return true;
@@ -1974,6 +1989,7 @@ public final class PortalSystemUiModule {
                         mDockBar.resetMagnification(false);
                     }
                     handleDragStateChanged(0, 0f);
+                    mOwnPortalDrag = false;
                     return true;
                 }
                 return true;
@@ -2039,6 +2055,13 @@ public final class PortalSystemUiModule {
                         isRight ? dp(88) : FrameLayout.LayoutParams.MATCH_PARENT,
                         isRight ? FrameLayout.LayoutParams.MATCH_PARENT : dp(153));
             }
+            int oldWidth = dockParams.width;
+            int oldHeight = dockParams.height;
+            int oldGravity = dockParams.gravity;
+            int oldLeftMargin = dockParams.leftMargin;
+            int oldTopMargin = dockParams.topMargin;
+            int oldRightMargin = dockParams.rightMargin;
+            int oldBottomMargin = dockParams.bottomMargin;
             if (isRight) {
                 dockParams.width = dp(88);
                 dockParams.height = FrameLayout.LayoutParams.MATCH_PARENT;
@@ -2064,7 +2087,14 @@ public final class PortalSystemUiModule {
                 dockParams.leftMargin = 0;
                 dockParams.topMargin = 0;
             }
-            mDockBar.setLayoutParams(dockParams);
+            // setLayoutParams requests another measure/layout even when every
+            // value is unchanged. Motion broadcasts must not relayout the row.
+            if (lp != dockParams || oldWidth != dockParams.width || oldHeight != dockParams.height
+                    || oldGravity != dockParams.gravity || oldLeftMargin != dockParams.leftMargin
+                    || oldTopMargin != dockParams.topMargin || oldRightMargin != dockParams.rightMargin
+                    || oldBottomMargin != dockParams.bottomMargin) {
+                mDockBar.setLayoutParams(dockParams);
+            }
         }
 
         
@@ -2516,6 +2546,7 @@ public final class PortalSystemUiModule {
                         + " at " + msSinceProcessStart() + "ms views=" + mViewsReady
                         + " targets=" + mTargets.size() + " config=" + mConfigLoaded);
             }
+            int previousState = mCurrentState;
             mCurrentState = state;
 
             if (state == 0) {
@@ -2555,7 +2586,10 @@ public final class PortalSystemUiModule {
 
             boolean isRight = "right".equals(mTriggerPosition);
             updateWindowParams(isRight);
-            updateDockConfiguration(isRight);
+            if (previousState != state || mDockBar.getOrientation() != (isRight
+                    ? ColorOSDockBar.ORIENTATION_VERTICAL : ColorOSDockBar.ORIENTATION_HORIZONTAL)) {
+                updateDockConfiguration(isRight);
+            }
 
             if (state == 1) {
                 // Phase 1: Glow view active, shelf collapsed
@@ -2571,18 +2605,20 @@ public final class PortalSystemUiModule {
                     mGlowView.setPhase1Progress(progress, isRight, y);
                     mGlowView.setVisibility(View.VISIBLE);
                 }
-                if (mDockBar != null && mDockBar.getVisibility() == View.VISIBLE) {
+                // State 1 also carries continuous position updates from AES
+                // and WMS. Start the exit once, rather than repeatedly cancelling
+                // and restarting its 160 ms timeline while the finger moves up.
+                if (previousState != 1 && mDockBar != null
+                        && mDockBar.getVisibility() == View.VISIBLE) {
                     mDockBar.animate().cancel();
-                    mDockBar.stopAutoScroll();
+                    mDockBar.onDragExited();
                     if (isRight) {
                         mDockBar.animate()
                                 .translationX(dp(60))
                                 .alpha(0f)
                                 .setDuration(160)
                                 .withEndAction(() -> {
-                                    if (mDockBar != null && mCurrentState != 2) {
-                                        mDockBar.setVisibility(View.GONE);
-                                    }
+                                    if (mCurrentState == 1) mDockBar.setVisibility(View.GONE);
                                 })
                                 .start();
                     } else {
@@ -2591,9 +2627,7 @@ public final class PortalSystemUiModule {
                                 .alpha(0f)
                                 .setDuration(160)
                                 .withEndAction(() -> {
-                                    if (mDockBar != null && mCurrentState != 2) {
-                                        mDockBar.setVisibility(View.GONE);
-                                    }
+                                    if (mCurrentState == 1) mDockBar.setVisibility(View.GONE);
                                 })
                                 .start();
                     }
@@ -2606,7 +2640,10 @@ public final class PortalSystemUiModule {
                     mGlowView.setPhase2(isRight, y);
                     mGlowView.setVisibility(View.VISIBLE);
                 }
-                if (mDockBar != null) {
+                if (mDockBar != null && (previousState != 2
+                        || mDockBar.getVisibility() != View.VISIBLE)) {
+                    // Re-entry can reverse a still-running exit. Cancel its end
+                    // action before it has a chance to hide the reopened row.
                     mDockBar.animate().cancel();
                     if (mDockBar.getVisibility() != View.VISIBLE) {
                         mDockBar.resetScroll();

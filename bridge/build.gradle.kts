@@ -12,8 +12,8 @@ android {
         applicationId = "com.github.leaf.hyperportal"
         minSdk = 34
         targetSdk = 37
-        versionCode = 25
-        versionName = "0.2.0-ai14"
+        versionCode = 26
+        versionName = "0.2.0-ai15"
 
         ndk {
             abiFilters += listOf("arm64-v8a")

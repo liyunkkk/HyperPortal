@@ -41,6 +41,7 @@ import java.util.concurrent.Executors;
 
 import io.github.libxposed.api.XposedInterface;
 import io.github.libxposed.api.XposedModule;
+import com.github.leaf.hyperportal.transferdock.TransferDockContract;
 
 /**
  * libxposed API 102 entry class.
@@ -801,6 +802,10 @@ public final class PortalSystemModule {
                     windowArg = arg;
                 }
             }
+            if (clip == null || clip.getDescription() == null
+                    || !clip.getDescription().hasMimeType(DRAG_MIME)) {
+                return chain.proceed();
+            }
             Object controller = chain.getThisObject();
             Object wms = null;
             try {
@@ -809,48 +814,46 @@ public final class PortalSystemModule {
             } catch (Throwable ignored) {
             }
             sDragSourcePackage = resolveDragSourcePackage(wms, windowArg);
-            if (clip != null && clip.getDescription().hasMimeType(DRAG_MIME)) {
-                sDragActive = true;
-                sDragStartX = -1f;
-                sDragStartY = -1f;
-                sProgress = 0f;
-                sTargetProgress = 0f;
-                sCurrentState = 1; // Drag started: Phase 1 (Glow mode)
-                sLastLogged = -1f;
-                sLastNotifiedX = -1f;
-                sLastNotifiedY = -1f;
+            sDragActive = true;
+            sDragStartX = -1f;
+            sDragStartY = -1f;
+            sProgress = 0f;
+            sTargetProgress = 0f;
+            sCurrentState = 1; // Drag started: Phase 1 (Glow mode)
+            sLastLogged = -1f;
+            sLastNotifiedX = -1f;
+            sLastNotifiedY = -1f;
 
-                try {
-                    Object ctx = getField(wms, "mContext");
-                    if (ctx instanceof Context) {
-                        sSystemContext = (Context) ctx;
-                    }
-                } catch (Throwable ignored) {
+            try {
+                Object ctx = getField(wms, "mContext");
+                if (ctx instanceof Context) {
+                    sSystemContext = (Context) ctx;
                 }
-                Object root = getField(wms, "mRoot");
+            } catch (Throwable ignored) {
+            }
+            Object root = getField(wms, "mRoot");
 
-                sTiltAllowed = !isOverlayDragSource(sDragSourcePackage);
-                Object task = resolveTargetTask(wms, root, windowArg);
-                sTask = task;
-                if (task != null) {
-                    sTaskSurface = (SurfaceControl) getField(task, "mSurfaceControl");
-                    log(Log.INFO, TAG, "our drag started target task=" + task
-                            + " surface=" + sTaskSurface + " tilt=" + sTiltAllowed
-                            + " source=" + sDragSourcePackage);
-                    if (sTiltAllowed) {
-                        prepareWallpaperSurface(task);
-                    }
-                } else {
-                    sTaskSurface = null;
-                    log(Log.WARN, TAG, "our drag started but no valid fullscreen task found"
-                            + " tilt=" + sTiltAllowed + " source=" + sDragSourcePackage);
+            sTiltAllowed = !isOverlayDragSource(sDragSourcePackage);
+            Object task = resolveTargetTask(wms, root, windowArg);
+            sTask = task;
+            if (task != null) {
+                sTaskSurface = (SurfaceControl) getField(task, "mSurfaceControl");
+                log(Log.INFO, TAG, "our drag started target task=" + task
+                        + " surface=" + sTaskSurface + " tilt=" + sTiltAllowed
+                        + " source=" + sDragSourcePackage);
+                if (sTiltAllowed) {
+                    prepareWallpaperSurface(task);
                 }
+            } else {
+                sTaskSurface = null;
+                log(Log.WARN, TAG, "our drag started but no valid fullscreen task found"
+                        + " tilt=" + sTiltAllowed + " source=" + sDragSourcePackage);
+            }
 
-                notifyPortalState(1, 0f, 0f);
-                if (sSystemContext != null) {
-                    ensureConfigReceiver(sSystemContext);
-                    queryConfigAsync(sSystemContext);
-                }
+            notifyPortalState(1, 0f, 0f);
+            if (sSystemContext != null) {
+                ensureConfigReceiver(sSystemContext);
+                queryConfigAsync(sSystemContext);
             }
         } catch (Throwable throwable) {
             log(Log.WARN, TAG, "onPerformDrag inspect failed", throwable);
@@ -1150,33 +1153,34 @@ public final class PortalSystemModule {
     }
 
     private static Object onDragClosed(XposedInterface.Chain chain) throws Throwable {
-        if (sDragActive) {
-            sDragActive = false;
-            sDragStartX = -1f;
-            sDragStartY = -1f;
-            sCurrentState = 0;
-            sTargetProgress = 0f;
-            startTicker();
-            notifyPortalState(0, 0f, 0f);
-            sHandler.postDelayed(() -> {
-                if (!sDragActive) {
-                    sProgress = 0f;
-                    sTargetProgress = 0f;
-                    applyTaskProgress(0f);
-                    if (sWallpaperSurface != null) {
-                        removeSurface(sWallpaperSurface);
-                        sWallpaperSurface = null;
-                    }
-                    sTask = null;
-                    sTaskSurface = null;
-                    sTiltAllowed = true;
-                }
-            }, 300);
-            log(Log.INFO, TAG, "our drag closed, restoring");
+        if (!sDragActive) {
+            return chain.proceed();
         }
+        sDragActive = false;
+        sDragStartX = -1f;
+        sDragStartY = -1f;
+        sCurrentState = 0;
+        sTargetProgress = 0f;
+        startTicker();
+        notifyPortalState(0, 0f, 0f);
+        sHandler.postDelayed(() -> {
+            if (!sDragActive) {
+                sProgress = 0f;
+                sTargetProgress = 0f;
+                applyTaskProgress(0f);
+                if (sWallpaperSurface != null) {
+                    removeSurface(sWallpaperSurface);
+                    sWallpaperSurface = null;
+                }
+                sTask = null;
+                sTaskSurface = null;
+                sTiltAllowed = true;
+            }
+        }, 300);
+        log(Log.INFO, TAG, "our drag closed, restoring");
         Object result = chain.proceed();
         try {
-            log(Log.INFO, TAG, "drag closed cleanup check wms=" + (sWms != null)
+            log(Log.INFO, TAG, "our drag closed cleanup wms=" + (sWms != null)
                     + " source=" + sDragSourcePackage);
             dismissWeChatHandleWindows(sWms, sDragSourcePackage);
         } catch (Throwable throwable) {
@@ -1383,9 +1387,6 @@ public final class PortalSystemModule {
     }
 
     private static boolean isOurDrag(Object dragState) {
-        if (sDragActive) {
-            return true;
-        }
         try {
             Object clipObject = getField(dragState, "mData");
             if (clipObject instanceof ClipData) {
@@ -1393,6 +1394,20 @@ public final class PortalSystemModule {
                 if (description != null && description.filterMimeTypes(DRAG_MIME) != null) {
                     return true;
                 }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    private static boolean isShareFallbackDrag(Object dragState) {
+        try {
+            Object clipObject = getField(dragState, "mData");
+            if (clipObject instanceof ClipData) {
+                ClipDescription description = ((ClipData) clipObject).getDescription();
+                return description != null
+                        && (description.filterMimeTypes(DRAG_MIME) != null
+                        || description.filterMimeTypes(TransferDockContract.DRAG_MIME) != null);
             }
         } catch (Throwable ignored) {
         }
@@ -1677,20 +1692,23 @@ public final class PortalSystemModule {
         if (window == null) {
             return false;
         }
+        Object controller = chain.getThisObject();
+        if (controller == null) {
+            return false;
+        }
+        Object dragState = getField(controller, "mDragState");
+        if (!isShareFallbackDrag(dragState)) {
+            return false; // preserve native handling for unrelated drags
+        }
         if (!dropToShareEnabled()) {
             return false;
         }
 
-        Object controller = chain.getThisObject();
         Object wms = getField(controller, "mService");
         if (wms == null) {
             return false;
         }
         sWms = wms;
-        Object dragState = getField(controller, "mDragState");
-        if (dragState == null) {
-            return false;
-        }
         Object clipObject = getField(dragState, "mData");
         if (!(clipObject instanceof ClipData)) {
             return false;
